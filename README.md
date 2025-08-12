@@ -39,13 +39,14 @@ cudnn-windows-x86_64-8.9.7.29_cuda12-archive.zip
 Extraemos el contenido de ese zip y de la carpeta "bin"
 
 Copiamos este par de archivos:
-cudnn_ops_infer64_8
-cudnn_cnn_infer64_8
+
+- cudnn_ops_infer64_8
+- cudnn_cnn_infer64_8
 
 a la siguiente ruta:
 
 ```
-C:\Dev\VTT-Udemy-Courses-fredyfx\whisperx311\Lib\site-packages\torch\lib
+C:\Dev\DEFCON-LaVillaProject\whisperx311\Lib\site-packages\torch\lib
 ```
 
 Ahora sí, ejecutamos y ya debería funcionar bien.
@@ -83,13 +84,14 @@ cudnn-windows-x86_64-8.9.7.29_cuda12-archive.zip
 We extract the contents of that zip and the "bin" folder
 
 Copy these two files:
-cudnn_ops_infer64_8
-cudnn_cnn_infer64_8
+
+- cudnn_ops_infer64_8
+- cudnn_cnn_infer64_8
 
 to the following path:
 
 ```
-C:\Dev\VTT-Udemy-Courses-fredyfx\whisperx311\Lib\site-packages\torch\lib
+C:\Dev\DEFCON-LaVillaProject\whisperx311\Lib\site-packages\torch\lib
 ```
 
 Now, run it and it should work fine.
