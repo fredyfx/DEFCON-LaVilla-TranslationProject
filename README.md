@@ -19,7 +19,15 @@ python -m venv whisperx311
 
 OJO, el 311 es solo el nombre.
 
-Ahora instalamos el whisperx
+Luego activamos el entorno virtual creado:
+
+```
+cd whisperx311
+cd Scripts
+activate
+```
+
+Regresamos al folder inicial e instalamos el whisperx
 
 ```
 pip install whisperx
@@ -64,7 +72,15 @@ python -m venv whisperx311
 
 NOTE: 311 is just the name.
 
-Now we install whisperx
+Then, we activate the virtual environment that we just created:
+
+```
+cd whisperx311
+cd Scripts
+activate
+```
+
+Let's return to the initial folder and install whisperx
 
 ```
 pip install whisperx
@@ -95,3 +111,63 @@ C:\Dev\DEFCON-LaVillaProject\whisperx311\Lib\site-packages\torch\lib
 ```
 
 Now, run it and it should work fine.
+
+
+# Ideas Generales
+
+Primero, conseguir todos los archivos del server FTP de la DEFCON, esto será de utilidad para poder hashear los archivos.
+
+Organizar todos los archivos en una base de datos donde se pueda apreciar:
+
+- Ruta completa.
+- Nombre de archivo.
+- Tipo de archivo.
+- Hash.
+- Estado (en proceso, completado, no iniciado).
+
+Ahora viene lo simpático:
+
+- Crear una API Web donde haya un token por usuario.
+- Esto es para identificar a los colaboradores.
+- Conociendo los colaboradores, publicar una lista de honor por su apoyo con esta aventura.
+
+¿Y entonces cuál es el plan?
+
+1. Registro en un sitio web de apoyo al proyecto.
+2. Obtener token (una simple GUID).
+3. Ver en la web, la lista de videos que están (en proceso, completado, no iniciado).
+4. Descargar los videos mediante el FTP de la DEFCON. Con esto estandarizamos las rutas y santo remedio.
+5. Agregar el token al código (que todavía no está programado) y dejar procesando.
+6. El resultado del proceso es enviar el archivo txt/md/json/vtt/src con el hash del video.
+
+¿Resultado?
+
+1. Tener un listado de los videos que tienen subtítulos en español, portugués u otro idioma.
+2. Teniendo el material, nos habilita el siguiente paso que es crear resúmenes de los videos (podría ser tipo netflix!!! DEFCONFLIX xD!!!!).
+3. Podemos crear un ranking de votaciones de los materiales, no solo un +1 o un -1, podríamos evaluar nivel técnico (1-5), entre otras variables.
+4. Colaboración de verificación humana para las traducciones y otros textos, esto es sumamente importante para el siguiente paso.
+5. Como tenemos todo el texto de cada video, podemos integrarlo con un LLM y realizar búsquedas semánticas.
+
+# Herramienta para editar archivos VTT
+
+Esto es algo que llevo rato trabajando para editar de manera más cómoda los archivos VTT y pues, a compartirlo también, estoy seguro que más gente le sacará provecho.
+Además, tengo la certeza que teniendo todo centralizado, nos permitirá avanzar más rápido con las verificaciones de texto de los videos.
+Esta parte del proyecto lo tengo en Angular y la idea es que funcione en algún server o sencillamente le den el clásico `ng server` y vaaaaamonos!
+
+# Búsquedas semánticas
+
+¿Te imaginas buscar sobre ESP32 y que te muestre todos los videos relacionados con ese término?
+
+¿Y si luego quieres incluir el término "Flipper Zero"?
+
+La búsqueda se va afinando, generando resultados que van más acorde, esto va más allá de un `"like %term%"`.
+
+Para la UI:
+
+- Una caja de texto con los términos.
+- Una lista de tags que han entrado en la búsqueda.
+- Una lista de los videos encontrados, ordenados con su ranking con respecto a los términos.
+
+# Contacto
+
+Si esto te interesa, quieres colaborar, ya sea con el código, con ideas, con procesamiento, con auspicio de algún tipo, ya saben cómo encontrarme (`@fredyfx` en Twitter, Telegram, Linkedin, IG).
