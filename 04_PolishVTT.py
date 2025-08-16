@@ -1,6 +1,9 @@
 import sqlite3
 import os
 
+# Important detail, this was the initial PoC
+# The sqlite is not going to be used for long term.
+
 # Replace 'your_database.db' with your SQLite database file name
 database_file = 'file_data.db'
 

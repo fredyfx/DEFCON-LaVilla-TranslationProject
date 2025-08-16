@@ -1,6 +1,9 @@
 import os
 import sqlite3
 
+# Important detail, this was the initial PoC
+# The sqlite is not going to be used for long term.
+
 # Connect to the SQLite database
 conn = sqlite3.connect('file_data.db')
 cursor = conn.cursor()

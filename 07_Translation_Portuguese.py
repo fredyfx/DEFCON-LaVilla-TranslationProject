@@ -5,6 +5,9 @@ from openai import OpenAI
 import os
 import sqlite3
 
+# Important detail, this was the initial PoC
+# The sqlite is not going to be used for long term.
+
 class VTTTranslator:
     def __init__(self, api_key: str = None):
         """

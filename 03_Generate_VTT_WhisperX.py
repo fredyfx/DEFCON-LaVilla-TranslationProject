@@ -5,6 +5,9 @@ import sqlite3
 import os
 import time
 
+# Important detail, this was the initial PoC
+# The sqlite is not going to be used for long term.
+
 database_file = 'file_data.db'
 
 connection = sqlite3.connect(database_file)
