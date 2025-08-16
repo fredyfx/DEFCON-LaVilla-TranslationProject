@@ -115,9 +115,45 @@ Now, run it and it should work fine.
 
 # Ideas Generales
 
-Primero, conseguir todos los archivos del server FTP de la DEFCON, esto será de utilidad para poder hashear los archivos.
+Primero, conseguir todos los archivos del server FTP de la DEFCON, esto será de utilidad para poder hashear los archivos. Luego les explico por qué.
 
-Organizar todos los archivos en una base de datos donde se pueda apreciar:
+¿Y esto cómo se hace?
+
+Creamos un folder llamado `cons` y dentro creamos otro folder llamado `DEF CON`. 
+Considera que luego de completar con la DEFCON, podemos expandir el proyecto con lo demás de la `InfoCon` https://infocon.org/ Por eso, mantener la estructura de `"cons/DEF CON"` es importante.
+
+Considerando que estás en alguna distro linuxera o haciendo uso de WSL desde el Windows, procede con el siguiente comando:
+
+```
+wget -r -N -np --cut-dirs=0 -A "*.pdf,*.PDF,*.pDF,*.pdF,*pDF,*.PDf,*.mp4,*.MP4,*.Mp4,*.mP4,*.srt,*.Srt,*.SRt,*.SRT,*.sRT,*.srT" --directory-prefix=. --no-host-directories media.defcon.org
+```
+
+Este commando nos descarga solo archivos PDF, mp4 y srt (para el objetivo del proyecto, es innecesario los archivos .zip, .rar, .7zip, etc).
+
+Explicación:
+
+`-r` (recursivo)
+
+`-N` esto es el timestamping, compara el archivo local con el remoto y solo descarga los archivos nuevos del server o si son inexistentes en local, del mismo modo, evitamos descargar archivos que no han sido modificados.
+
+`-np` (no parent) esto evita ir hacia folders que están "arriba", es decir, `"/files/docs"` hacia `"files"`, nos aseguramos que el `wget` se mantenga en la ruta específica.
+
+`--cut-dirs=X` donde X es un número, en este caso es `0`, esto es algo enredado de entender, para hacerlo fácil, un ejemplo:
+
+```
+ftp://server.com/dir1/dir2/dir3/
+                 ↑    ↑    ↑
+                 1    2    3  = --cut-dirs=3
+``` 
+
+
+`-A` Accept/download solo archivos que hacen match con el patrón. En el código tenemos archivos PDF, MP4 y SRT.
+
+`--directory-prefix=` Esto te dice dónde se va a descargar. Sin esto, se graba exactamente en el mismo lugar donde estás trabajando.
+
+`--no-host-directories` Con esto nos olvidamos de tener un nuevo folder con el nombre del server.
+
+Ahora, como ya tenemos el server descargado, vamos a organizar todos los archivos en una base de datos donde se pueda apreciar:
 
 - Ruta completa.
 - Nombre de archivo.
