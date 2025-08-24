@@ -1,0 +1,79 @@
+using defconflix.Data;
+using defconflix.Interfaces;
+using defconflix.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace defconflix.Middleware
+{
+    public class AuthenticationMiddleware
+    {
+        private readonly RequestDelegate _next;
+
+        public AuthenticationMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        public async Task InvokeAsync(HttpContext context)
+        {
+            if (context.Request.Path.StartsWithSegments("/api/protected"))
+            {
+                var apiKey = context.Request.Headers["X-API-Key"].FirstOrDefault();
+                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+
+                User user = null;
+
+                using var scope = context.RequestServices.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApiContext>();
+
+                // Try JWT token first
+                if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+                {
+                    var token = authHeader.Substring("Bearer ".Length).Trim();
+                    var jwtService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+                    var principal = jwtService.ValidateToken(token);
+
+                    if (principal != null)
+                    {
+                        var userId = principal.FindFirst("userId")?.Value;
+                        if (int.TryParse(userId, out var id))
+                        {
+                            user = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.IsActive);
+                        }
+                    }
+                }
+                // Fallback to API Key
+                else if (!string.IsNullOrEmpty(apiKey))
+                {
+                    user = await db.Users.FirstOrDefaultAsync(u => u.ApiKey == apiKey && u.IsActive);
+                }
+
+                if (user == null)
+                {
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsync("Authentication required. Use Bearer token or X-API-Key header.");
+                    return;
+                }
+
+                // Update last accessed
+                user.LastAccessedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+
+                // Add user info to context
+                context.Items["UserId"] = user.Id;
+                context.Items["Username"] = user.Username;
+                context.Items["User"] = user;
+            }
+
+            await _next(context);
+        }
+    }
+
+    public static class AuthenticationMiddlewareExtensions
+    {
+        public static IApplicationBuilder UseAuthenticationMiddleware(this IApplicationBuilder builder)
+        {
+            return builder.UseMiddleware<AuthenticationMiddleware>();
+        }
+    }
+}
