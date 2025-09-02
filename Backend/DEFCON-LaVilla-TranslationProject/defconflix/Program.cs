@@ -2,7 +2,6 @@ using defconflix.Data;
 using defconflix.Extensions;
 using defconflix.Interfaces;
 using defconflix.Middleware;
-using defconflix.Models;
 using defconflix.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +20,7 @@ builder.Services.AddAuthorization();
 
 // Add services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IFileTextService, FileTextService>();
 
 // Adding Endpoints
 builder.Services.AddEndpoints();

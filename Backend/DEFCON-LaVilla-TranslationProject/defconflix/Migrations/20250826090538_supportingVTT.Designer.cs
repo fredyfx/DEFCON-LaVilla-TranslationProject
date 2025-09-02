@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using defconflix.Data;
@@ -11,9 +12,11 @@ using defconflix.Data;
 namespace defconflix.Migrations
 {
     [DbContext(typeof(ApiContext))]
-    partial class ApiContextModelSnapshot : ModelSnapshot
+    [Migration("20250826090538_supportingVTT")]
+    partial class supportingVTT
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,9 +57,6 @@ namespace defconflix.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("hash");
-
-                    b.Property<int>("ProcessedBy")
-                        .HasColumnType("integer");
 
                     b.Property<int>("Size_Bytes")
                         .HasColumnType("integer")

@@ -20,10 +20,11 @@ namespace defconflix.Models
         [Column("hash")]
         public string Hash { get; set; }
         [Column("status")]
-        public string Status { get; set; }
+        public string Status { get; set; } // Not started, In Progress, Completed
         [Column("created_at")]
         public DateTime Created_At { get; set; }
         [Column("updated_at")]
         public DateTime? Updated_At { get; set; }
+        public int ProcessedBy { get; set; }
     }
 }
