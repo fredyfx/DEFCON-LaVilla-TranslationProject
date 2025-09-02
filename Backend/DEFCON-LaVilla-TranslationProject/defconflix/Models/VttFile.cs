@@ -19,7 +19,6 @@ namespace defconflix.Models
         public int Id { get; set; }
 
         public string FileName { get; set; }
-        public string Hash { get; set; }
         public string Language { get; set; }
                 
         public string Header { get; set; } = "WEBVTT";

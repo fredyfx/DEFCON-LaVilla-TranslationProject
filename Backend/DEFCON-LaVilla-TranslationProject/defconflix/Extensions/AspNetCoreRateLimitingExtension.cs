@@ -16,7 +16,7 @@ namespace defconflix.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 100,
+                            PermitLimit = 20,
                             Window = TimeSpan.FromMinutes(1)
                         }));
 

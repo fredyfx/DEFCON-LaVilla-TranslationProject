@@ -28,13 +28,13 @@ namespace defconflix.Services
             return vttFile.ExtractPureText(options);
         }
 
-        public async Task<string?> GetPureTextByHashAsync(string hash, VttTextExtractionOptions? options = null)
+        public async Task<string?> GetPureTextByIdAsync(int id, VttTextExtractionOptions? options = null)
         {
             options ??= new VttTextExtractionOptions();
 
             var vttFile = await _context.VttFiles
                 .Include(v => v.Cues)
-                .FirstOrDefaultAsync(v => v.Hash== hash);
+                .FirstOrDefaultAsync(v => v.Id == id);
 
             if (vttFile == null)
                 return null;

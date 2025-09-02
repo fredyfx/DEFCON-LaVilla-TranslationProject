@@ -9,8 +9,8 @@ namespace defconflix.Endpoints
 {
     public class FilesEndpoint : IEndpoint
     {
-        public record BulkDownloadRequest(string[] Hashes);
-        public record FileDTO(int Id, string FileName, string Hash, string Status);
+        public record BulkDownloadRequest(int[] Ids);
+        public record FileDTO(int Id, string FileName, string Status);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
             //api/files/txt?page=5&pagesize=20
@@ -22,7 +22,7 @@ namespace defconflix.Endpoints
                 // type should be either mp4 or pdf or srt or txt:
                 if (fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt" && fileTypeRequested != "txt")
                 {
-                    return Results.BadRequest("Invalid file type requested. Only 'mp4' and 'pdf' are supported.");
+                    return Results.BadRequest("Invalid file type requested. Only 'mp4', 'pdf', 'srt' and 'txt' are supported.");
                 }
 
                 // Validate pagination parameters
@@ -54,7 +54,7 @@ namespace defconflix.Endpoints
                     .OrderBy(u => u.Id)
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Hash, u.Status))
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
                     .ToListAsync();
 
                 return Results.Json(new
@@ -72,10 +72,10 @@ namespace defconflix.Endpoints
                 });
             });
 
-            app.MapGet("/api/file/{hash}", async (ApiContext db, string hash) =>
+            app.MapGet("/api/file/{id}", async (ApiContext db, int id) =>
             {
                 var file = await db.Files
-                    .Where(f => f.Hash == hash)
+                    .Where(f => f.Id == id)
                     .Select(u => GetFTPLocation(u.File_Path))
                     .SingleOrDefaultAsync();
 
@@ -88,37 +88,37 @@ namespace defconflix.Endpoints
             app.MapPost("/api/files/download", async (ApiContext db, BulkDownloadRequest request) =>
             {
                 // Validate input
-                if (request.Hashes == null || request.Hashes.Length == 0)
+                if (request.Ids == null || request.Ids.Length == 0)
                 {
-                    return Results.BadRequest("No hashes provided.");
+                    return Results.BadRequest("No IDs provided.");
                 }
 
-                // Limit the number of hashes to prevent abuse
-                if (request.Hashes.Length > 100)
+                // Limit the number of Ids to prevent abuse
+                if (request.Ids.Length > 100)
                 {
-                    return Results.BadRequest("Maximum 100 hashes allowed per request.");
+                    return Results.BadRequest("Maximum 100 Ids allowed per request.");
                 }
 
                 try
                 {
-                    // Get all files matching the provided hashes
+                    // Get all files matching the provided Ids
                     var files = await db.Files
-                        .Where(f => request.Hashes.Contains(f.Hash))
-                        .Select(f => new { f.Hash, f.File_Path })
+                        .Where(f => request.Ids.Contains(f.Id))
+                        .Select(f => new { f.Id, f.File_Path })
                         .ToListAsync();
 
                     if (!files.Any())
                     {
-                        return Results.NotFound("No files found for the provided hashes.");
+                        return Results.NotFound("No files found for the provided ids.");
                     }
 
                     // Generate URLs and create the text content
                     var urlBuilder = new StringBuilder();
 
-                    // Process hashes in the order they were provided
-                    foreach (var hash in request.Hashes)
+                    // Process the IDs in the order they were provided
+                    foreach (var currentId in request.Ids)
                     {
-                        var file = files.FirstOrDefault(f => f.Hash == hash);
+                        var file = files.FirstOrDefault(f => f.Id == currentId);
                         if (file != null)
                         {
                             var url = GetFTPLocation(file.File_Path);
@@ -143,48 +143,48 @@ namespace defconflix.Endpoints
                 }
             });
 
-            app.MapGet("/api/files/download", async (ApiContext db, string hashes) =>
+            app.MapGet("/api/files/download", async (ApiContext db, string ids) =>
             {
-                // Parse comma-separated hashes from query parameter
-                if (string.IsNullOrEmpty(hashes))
+                // Parse comma-separated Ids from query parameter
+                if (string.IsNullOrEmpty(ids))
                 {
-                    return Results.BadRequest("No hashes provided.");
+                    return Results.BadRequest("No Id provided.");
                 }
 
-                var hashArray = hashes.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                     .Select(h => h.Trim())
+                var idsArray = ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                     .Select(h => int.Parse(h.Trim()))
                                      .ToArray();
 
-                if (hashArray.Length == 0)
+                if (idsArray.Length == 0)
                 {
-                    return Results.BadRequest("No valid hashes provided.");
+                    return Results.BadRequest("No valid Ids provided.");
                 }
 
-                if (hashArray.Length > 20) // Lower limit for GET requests
+                if (idsArray.Length > 20) // Lower limit for GET requests
                 {
-                    return Results.BadRequest("Maximum 20 hashes allowed for GET request. Use POST for larger requests.");
+                    return Results.BadRequest("Maximum 20 ids allowed for GET request. Use POST for larger requests.");
                 }
 
                 try
                 {
-                    // Get all files matching the provided hashes
+                    // Get all files matching the provided Ids
                     var files = await db.Files
-                        .Where(f => hashArray.Contains(f.Hash))
-                        .Select(f => new { f.Hash, f.File_Path })
+                        .Where(f => idsArray.Contains(f.Id))
+                        .Select(f => new { f.Id, f.File_Path })
                         .ToListAsync();
 
                     if (!files.Any())
                     {
-                        return Results.NotFound("No files found for the provided hashes.");
+                        return Results.NotFound("No files found for the provided ids.");
                     }
 
                     // Generate URLs and create the text content
                     var urlBuilder = new StringBuilder();
 
-                    // Process hashes in the order they were provided
-                    foreach (var hash in hashArray)
+                    // Process ids in the order they were provided
+                    foreach (var currentId in idsArray)
                     {
-                        var file = files.FirstOrDefault(f => f.Hash == hash);
+                        var file = files.SingleOrDefault(f => f.Id == currentId);
                         if (file != null)
                         {
                             var url = GetFTPLocation(file.File_Path);

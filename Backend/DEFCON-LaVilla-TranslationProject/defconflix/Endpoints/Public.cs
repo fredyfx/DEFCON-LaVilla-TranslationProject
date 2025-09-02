@@ -11,7 +11,7 @@ namespace defconflix.Endpoints
                 GitHub OAuth API with JWT and Rate Limiting
     
                 Authentication Endpoints:
-                - GET /login - Start GitHub OAuth flow
+                - GET /login - Start GitHub OAuth flow (WIP)
                 - GET /profile - View profile, API key and JWT token (requires GitHub OAuth)
                 - POST /api/reset-key - Reset API key (requires GitHub OAuth)
                 - POST /api/auth/token - Get JWT token using API key
@@ -28,17 +28,18 @@ namespace defconflix.Endpoints
 
                 Public Access:
                 - GET /api/users
-                - GET /api/files/{type} - mp4, pdf are the current options available.
-                - GET /api/file/{hash} - this provides the detail of a file.
-                - GET /api/files/download?hashes=HASH1,HASH2,HASH3... - This handles up to 20 hashes. It downloads a text file.                
-                - POST /api/files/download - This expects to have in the body request: Hashes[] where you can enter more than 20.
+                - GET /api/files/{type} - mp4, pdf, srt, txt are the current options available.
+                - GET /api/files/{type}?page=5&pagesize=20 - pagination available.
+                - GET /api/file/{id} - this provides the detail of a file.
+                - GET /api/files/download?ids=1,2,3... - This handles up to 20 Ids. It downloads a text file.                
+                - POST /api/files/download - This expects to have in the body request: Ids[] where you can enter more than 20.
                 - GET /api/tools/downloader - This provides a script to download the videos inside of a text file.               
     
                 Rate Limits:
                 - Auth endpoints: 10 requests/minute
                 - API Key endpoints: 100 requests/minute  
                 - Authenticated endpoints: 500 requests/minute (token bucket)
-                - Global: 1000 requests/minute
+                - Global: 20 requests/minute
     
                 Authentication Methods:
                 1. Header: Authorization: Bearer <jwt-token>

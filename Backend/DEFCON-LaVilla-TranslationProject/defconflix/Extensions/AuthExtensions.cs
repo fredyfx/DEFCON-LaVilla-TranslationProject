@@ -26,7 +26,7 @@ namespace defconflix.Extensions
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             }).AddJwtBearer(options => {
-                options.RequireHttpsMetadata = false; // Set to true in production
+                options.RequireHttpsMetadata = true; // Set to true in production
                 options.SaveToken = true;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -45,11 +45,14 @@ namespace defconflix.Extensions
             {                
                 options.ClientId = configuration["GitHub:ClientId"];
                 options.ClientSecret = configuration["GitHub:ClientSecret"];
-                options.CallbackPath = "/sigin-github";
+                options.CallbackPath = "/signin-github";
 
                 options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
                 options.TokenEndpoint = "https://github.com/login/oauth/access_token";
                 options.UserInformationEndpoint = "https://api.github.com/user";
+
+                // Add scope to request email access
+                options.Scope.Add("user:email");
 
                 options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
                 options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");

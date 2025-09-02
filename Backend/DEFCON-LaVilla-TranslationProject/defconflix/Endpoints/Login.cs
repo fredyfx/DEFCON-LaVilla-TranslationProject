@@ -13,7 +13,7 @@ namespace defconflix.Endpoints
                 {
                     RedirectUri = "/profile"
                 });
-            }).RequireRateLimiting("AuthPolicy");
+            });
         }
     }
 }
