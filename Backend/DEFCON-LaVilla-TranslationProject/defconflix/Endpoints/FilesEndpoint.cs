@@ -13,13 +13,14 @@ namespace defconflix.Endpoints
         public record FileDTO(int Id, string FileName, string Hash, string Status);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
+            //api/files/txt?page=5&pagesize=20
             app.MapGet("/api/files/{type}", async (ApiContext db, string type, int page = 1, int pageSize = 10) =>
             {
                 // Validation for type parameter
                 var fileTypeRequested = type.ToLower();
 
-                // type should be either mp4 or pdf:
-                if (fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt")
+                // type should be either mp4 or pdf or srt or txt:
+                if (fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt" && fileTypeRequested != "txt")
                 {
                     return Results.BadRequest("Invalid file type requested. Only 'mp4' and 'pdf' are supported.");
                 }
@@ -30,8 +31,9 @@ namespace defconflix.Endpoints
 
                 Expression<Func<Files, bool>> filterFiles = f => true;
                 Expression<Func<Files, bool>> filterVideos = f => f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterPdfs = f => f.Extension.ToLower() == ".pdf";
-                Expression<Func<Files, bool>> filterSRTs = f => f.Extension.ToLower() == ".srt";
+                Expression<Func<Files, bool>> filterPdfs = f => f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterSRTs = f => f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterTxts = f => f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
 
                 // Apply the appropriate filter based on the requested file type using switch expression
                 var filter = type.ToLower() switch
@@ -39,6 +41,7 @@ namespace defconflix.Endpoints
                     "mp4" => filterVideos,
                     "pdf" => filterPdfs,
                     "srt" => filterSRTs,
+                    "txt" => filterTxts,
                     _ => filterFiles // Default case, should not be hit due to earlier validation
                 };
 

@@ -20,7 +20,9 @@ namespace defconflix.Endpoints
                 Protected Endpoints (require Bearer token or X-API-Key header):
                 - GET /api/protected/user-info - Get user information
                 - GET /api/protected/user-stats - Get detailed user statistics
-    
+                - POST /api/vttfile - Initialize the processing of files
+                - POST /api/vttcue - Updating the database along your processing on-demand
+
                 Admin Endpoints (require JWT token):
                 - GET /api/admin/users - List all users
 
@@ -30,7 +32,7 @@ namespace defconflix.Endpoints
                 - GET /api/file/{hash} - this provides the detail of a file.
                 - GET /api/files/download?hashes=HASH1,HASH2,HASH3... - This handles up to 20 hashes. It downloads a text file.                
                 - POST /api/files/download - This expects to have in the body request: Hashes[] where you can enter more than 20.
-                - GET /api/tools/downloader - This provides a script to download the videos inside of a text file.
+                - GET /api/tools/downloader - This provides a script to download the videos inside of a text file.               
     
                 Rate Limits:
                 - Auth endpoints: 10 requests/minute
