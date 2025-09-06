@@ -24,7 +24,7 @@ namespace defconflix.Extensions
             services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = "GitHub";
                 options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             }).AddJwtBearer(options =>
             {
@@ -80,72 +80,90 @@ namespace defconflix.Extensions
                 options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
                 options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
                 options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
-                options.ClaimActions.MapJsonKey("avatar_url", "avatar_url");
-                options.ClaimActions.MapJsonKey("name", "name");
 
                 var baseUrl = configuration["BaseUrl"] ?? throw new InvalidOperationException("BaseUrl not configured");
 
                 options.Events = new OAuthEvents
                 {
+                    // Handle reverse proxy scenarios
                     OnRedirectToAuthorizationEndpoint = context =>
                     {
-                        // Force HTTPS in redirect URI if specified
-                        if (baseUrl.StartsWith("https://"))
-                        {
-                            var redirectUri = context.RedirectUri;
-                            if (redirectUri.StartsWith("http://"))
-                            {
-                                redirectUri = redirectUri.Replace("http://", "https://");
-                                context.Response.Redirect(context.Request.Scheme + "://" + context.Request.Host + context.Options.AuthorizationEndpoint +
-                                    "?client_id=" + Uri.EscapeDataString(options.ClientId) +
-                                    "&redirect_uri=" + Uri.EscapeDataString(redirectUri) +
-                                    "&scope=" + Uri.EscapeDataString(string.Join(" ", options.Scope)) +
-                                    "&state=" + Uri.EscapeDataString(context.Properties.Items[".xsrf"]));
-                                return Task.CompletedTask;
-                            }
-                        }
-                        context.Response.Redirect(context.RedirectUri);
+                        // Hard-code the production URL to avoid proxy confusion
+                        var redirectUri = "https://infoconflix.com/signin-github";
+
+                        var authorizationEndpoint =
+                          $"{options.AuthorizationEndpoint}?" +
+                          $"client_id={Uri.EscapeDataString(options.ClientId)}&" +
+                          $"scope={Uri.EscapeDataString(string.Join(" ", options.Scope))}&" +
+                          $"response_type=code&" +
+                          $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
+                          $"state={Uri.EscapeDataString(options.StateDataFormat.Protect(context.Properties))}";
+
+                        context.Response.Redirect(authorizationEndpoint);
                         return Task.CompletedTask;
                     },
                     OnCreatingTicket = async context =>
                     {
-                        // Get user information
-                        var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-                        request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-                        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+                        var logger = context.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("AuthExtensions");
 
-                        var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
-                        response.EnsureSuccessStatusCode();
+                        logger.LogInformation("OAuth OnCreatingTicket started for user");
 
-                        var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-                        context.RunClaimActions(json.RootElement);
-
-                        // Get user email if not present (some users don't make their email public)
-                        if (!context.Principal.Claims.Any(c => c.Type == ClaimTypes.Email && !string.IsNullOrEmpty(c.Value)))
+                        try
                         {
-                            var emailRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
-                            emailRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-                            emailRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+                            // Get user information
+                            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+                            request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
 
-                            var emailResponse = await context.Backchannel.SendAsync(emailRequest, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+                            var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+                            response.EnsureSuccessStatusCode();
 
-                            if (emailResponse.IsSuccessStatusCode)
+                            var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                            context.RunClaimActions(json.RootElement);
+
+                            // Get user email if not present (some users don't make their email public)
+                            if (!context.Principal.Claims.Any(c => c.Type == ClaimTypes.Email && !string.IsNullOrEmpty(c.Value)))
                             {
-                                var emailsJson = JsonDocument.Parse(await emailResponse.Content.ReadAsStringAsync());
-                                var primaryEmail = emailsJson.RootElement.EnumerateArray()
-                                    .FirstOrDefault(email => email.GetProperty("primary").GetBoolean());
+                                var emailRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
+                                emailRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                                emailRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
 
-                                if (primaryEmail.ValueKind != JsonValueKind.Undefined)
+                                var emailResponse = await context.Backchannel.SendAsync(emailRequest, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+
+                                if (emailResponse.IsSuccessStatusCode)
                                 {
-                                    var emailAddress = primaryEmail.GetProperty("email").GetString();
-                                    if (!string.IsNullOrEmpty(emailAddress))
+                                    var emailsJson = JsonDocument.Parse(await emailResponse.Content.ReadAsStringAsync());
+                                    var primaryEmail = emailsJson.RootElement.EnumerateArray()
+                                        .FirstOrDefault(email => email.GetProperty("primary").GetBoolean());
+
+                                    if (primaryEmail.ValueKind != JsonValueKind.Undefined)
                                     {
-                                        var identity = (ClaimsIdentity)context.Principal.Identity;
-                                        identity.AddClaim(new Claim(ClaimTypes.Email, emailAddress));
+                                        var emailAddress = primaryEmail.GetProperty("email").GetString();
+                                        if (!string.IsNullOrEmpty(emailAddress))
+                                        {
+                                            var identity = (ClaimsIdentity)context.Principal.Identity;
+                                            identity.AddClaim(new Claim(ClaimTypes.Email, emailAddress));
+                                        }
                                     }
                                 }
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"OAuth error: {ex.Message}");
+                            logger.LogError(ex, "Error during OAuth authentication");
+                            throw;
+                        }
+                       
+                    },
+                    OnRemoteFailure = context =>
+                    {
+                        // Handle OAuth failures
+                        context.Response.Redirect("/login?error=oauth_failed");
+                        context.HandleResponse();
+                        return Task.CompletedTask;
                     }
                 };
             });

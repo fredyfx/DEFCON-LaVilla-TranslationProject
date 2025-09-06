@@ -8,6 +8,22 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 var Configuration = builder.Configuration;
 
+// Configure forwarded headers for reverse proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                              Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto |
+                              Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
+
+    // Clear known networks and proxies to allow Cloudflare IPs
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+
+    // Trust all proxies when using Cloudflare (they use many IP ranges)
+    options.RequireHeaderSymmetry = false;
+    options.ForwardLimit = null; // Allow unlimited forwarded IPs
+});
+
 // Add PostgreSQL database
 builder.Services.AddPersistenceFX(Configuration);
 
@@ -34,11 +50,7 @@ using (var scope = app.Services.CreateScope())
     await context.Database.MigrateAsync();
 }
 
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
-                      Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-});
+app.UseForwardedHeaders();
 
 
 // Middleware

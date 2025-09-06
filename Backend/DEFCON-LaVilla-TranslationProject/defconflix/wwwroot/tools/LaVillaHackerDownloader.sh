@@ -64,12 +64,21 @@ echo "Starting downloads from $FILENAME..."
 echo "=================================="
 
 # Read each line from the file and execute wget
-while IFS= read -r url; do
+while IFS= read -r line; do
     # Skip empty lines
-    if [ -n "$url" ]; then
-        echo "Downloading: $url"
-        wget "$url"
-        echo "---"
+    if [ -n "$line" ]; then
+        # Extract ID and URL from the line (format: "ID URL")
+        id=$(echo "$line" | cut -d' ' -f1)
+        url=$(echo "$line" | cut -d' ' -f2-)
+        
+        # Skip if no URL found
+        if [ -n "$url" ]; then
+            echo "Downloading ID $id: $url"
+            wget "$url"
+            echo "---"
+        else
+            echo "Warning: No URL found for ID $id"
+        fi
     fi
 done < "$FILENAME"
 

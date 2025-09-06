@@ -19,17 +19,23 @@ namespace defconflix.Endpoints
                 var error = context.Request.Query["error"].FirstOrDefault();
                 if (!string.IsNullOrEmpty(error))
                 {
-                    return Results.Json(new
+                    var errorMessage = error switch
                     {
-                        error = error,
-                        message = "Authentication failed. Please try again.",
-                        retry_url = "/login"
-                    });
+                        "oauth_failed" => "GitHub OAuth authentication failed. Please try again.",
+                        "missing_claims" => "Required information missing from GitHub. Please try again.",
+                        _ => "Authentication error occurred. Please try again."
+                    };
+
+                    return Results.Text($"Login Error: {errorMessage}\n\nClick here to try again: <a href='/login'>Login with GitHub</a>", "text/html");
                 }
 
                 await context.ChallengeAsync("GitHub", new AuthenticationProperties
                 {
-                    RedirectUri = "/profile"
+                    RedirectUri = "/profile",
+                    Items =
+                    {
+                        { "scheme", "GitHub" }
+                    }
                 });
 
                 return Results.Empty;

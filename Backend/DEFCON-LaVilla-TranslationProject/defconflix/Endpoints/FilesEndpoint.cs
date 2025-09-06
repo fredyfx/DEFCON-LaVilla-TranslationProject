@@ -113,7 +113,7 @@ namespace defconflix.Endpoints
                     }
 
                     // Generate URLs and create the text content
-                    var urlBuilder = new StringBuilder();
+                    var contentBuilder = new StringBuilder();
 
                     // Process the IDs in the order they were provided
                     foreach (var currentId in request.Ids)
@@ -122,11 +122,12 @@ namespace defconflix.Endpoints
                         if (file != null)
                         {
                             var url = GetFTPLocation(file.File_Path);
-                            urlBuilder.AppendLine(url);
+                            var content = $"{currentId} {url}";
+                            contentBuilder.AppendLine(content);
                         }
                     }
 
-                    var textContent = urlBuilder.ToString();
+                    var textContent = contentBuilder.ToString();
                     var fileBytes = Encoding.UTF8.GetBytes(textContent);
 
                     // Return as downloadable text file
@@ -179,7 +180,7 @@ namespace defconflix.Endpoints
                     }
 
                     // Generate URLs and create the text content
-                    var urlBuilder = new StringBuilder();
+                    var contentBuilder = new StringBuilder();
 
                     // Process ids in the order they were provided
                     foreach (var currentId in idsArray)
@@ -188,11 +189,12 @@ namespace defconflix.Endpoints
                         if (file != null)
                         {
                             var url = GetFTPLocation(file.File_Path);
-                            urlBuilder.AppendLine(url);
+                            var content = $"{currentId} {url}";
+                            contentBuilder.AppendLine(content);
                         }
                     }
 
-                    var textContent = urlBuilder.ToString();
+                    var textContent = contentBuilder.ToString();
                     var fileBytes = Encoding.UTF8.GetBytes(textContent);
 
                     // Return as downloadable text file
