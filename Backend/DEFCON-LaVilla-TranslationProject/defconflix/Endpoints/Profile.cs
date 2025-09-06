@@ -18,38 +18,30 @@ namespace defconflix.Endpoints
                 }
 
                 var githubId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
-                var email = context.User.FindFirst(ClaimTypes.Email)?.Value;
 
-                // Check if user exists, if not create them
-                var existingUser = await db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubId);
-                if (existingUser == null)
+                if (string.IsNullOrEmpty(githubId))
                 {
-                    var newUser = new User
-                    {
-                        GitHubId = githubId,
-                        Username = username,
-                        Email = email,
-                        ApiKey = Guid.NewGuid().ToString(),
-                        CreatedAt = DateTime.UtcNow,
-                        IsActive = true
-                    };
+                    return Results.Redirect("/login?error=invalid_session");
+                }
 
-                    db.Users.Add(newUser);
-                    await db.SaveChangesAsync();
-                    existingUser = newUser;
+                var user = await db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubId);
+
+                if (user == null)
+                {
+                    return Results.Redirect("/login?error=user_not_found");
                 }
 
                 // Generate JWT token
-                var token = jwtService.GenerateToken(existingUser);
+                var token = jwtService.GenerateToken(user);
 
                 return Results.Json(new
                 {
-                    Username = existingUser.Username,
-                    Email = existingUser.Email,
-                    ApiKey = existingUser.ApiKey,
+                    Username = user.Username,
+                    Email = user.Email,
+                    ApiKey = user.ApiKey,
                     JwtToken = token,
-                    CreatedAt = existingUser.CreatedAt
+                    CreatedAt = user.CreatedAt,
+                    LastAccessed = user.LastAccessedAt
                 });
             }).RequireRateLimiting("AuthPolicy");
         }

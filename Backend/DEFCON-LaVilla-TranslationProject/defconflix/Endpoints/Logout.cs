@@ -11,7 +11,7 @@ namespace defconflix.Endpoints
             app.MapGet("/logout", async (HttpContext context) =>
             {
                 await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                return Results.Redirect("/");
+                return Results.Ok(new { message = "Logged out successfully" });
             });
         }
     }

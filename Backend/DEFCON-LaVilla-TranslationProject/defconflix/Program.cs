@@ -27,11 +27,19 @@ builder.Services.AddEndpoints();
 
 var app = builder.Build();
 
+// Database migration
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApiContext>();
     await context.Database.MigrateAsync();
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
+                      Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
 
 // Middleware
 app.UseRateLimiter();

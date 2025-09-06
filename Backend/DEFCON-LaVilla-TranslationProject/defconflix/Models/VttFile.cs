@@ -20,7 +20,8 @@ namespace defconflix.Models
 
         public string FileName { get; set; }
         public string Language { get; set; }
-                
+        public int FileId { get; set; }
+
         public string Header { get; set; } = "WEBVTT";
 
         public string? Notes { get; set; }
