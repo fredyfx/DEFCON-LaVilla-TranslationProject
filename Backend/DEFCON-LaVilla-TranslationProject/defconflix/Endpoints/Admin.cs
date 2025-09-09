@@ -1,6 +1,4 @@
-﻿using defconflix.Data;
-using defconflix.Interfaces;
-using Microsoft.EntityFrameworkCore;
+﻿using defconflix.Interfaces;
 
 namespace defconflix.Endpoints
 {
@@ -8,20 +6,10 @@ namespace defconflix.Endpoints
     {
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapGet("/api/admin/users", async (ApiContext db) =>
+            app.MapGet("/api/admin/dashboard", () =>
             {
-                var users = await db.Users
-                    .Select(u => new { 
-                        u.Id, 
-                        u.Username, 
-                        u.Email, 
-                        u.CreatedAt, 
-                        u.IsActive, 
-                        u.LastAccessedAt })
-                    .ToListAsync();
-                return Results.Json(users);
-            }).RequireAuthorization()
-            .RequireRateLimiting("AuthenticatedPolicy");
+                return Results.Json(new { data = "WIP" });
+            }).RequireRateLimiting("AuthenticatedPolicy");
         }
     }
 }

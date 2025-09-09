@@ -83,7 +83,7 @@ namespace defconflix.Endpoints
                 {
                     File = file
                 });
-            });
+            }).RequireAuthorization();
 
             app.MapPost("/api/files/download", async (ApiContext db, BulkDownloadRequest request) =>
             {
@@ -142,7 +142,7 @@ namespace defconflix.Endpoints
                     // Log the exception if you have logging configured
                     return Results.Problem("An error occurred while processing the request.");
                 }
-            });
+            }).RequireAuthorization();
 
             app.MapGet("/api/files/download", async (ApiContext db, string ids) =>
             {
@@ -209,7 +209,7 @@ namespace defconflix.Endpoints
                     // Log the exception if you have logging configured
                     return Results.Problem("An error occurred while processing the request.");
                 }
-            });
+            }).RequireAuthorization();
         }
 
         static string GetFTPLocation(string filePath)

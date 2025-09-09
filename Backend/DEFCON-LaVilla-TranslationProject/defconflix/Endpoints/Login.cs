@@ -1,5 +1,6 @@
 ﻿using defconflix.Interfaces;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace defconflix.Endpoints
 {
@@ -7,16 +8,26 @@ namespace defconflix.Endpoints
     {
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapGet("/login", async (HttpContext context) =>
+            app.MapGet("/login", async (HttpContext context, string? error = null) =>
             {
-                // Check if already authenticated
-                if (context.User.Identity?.IsAuthenticated == true)
+                // If user is already authenticated but there was an error, force logout first
+                if (context.User.Identity.IsAuthenticated && !string.IsNullOrEmpty(error))
+                {
+                    if (error == "user_not_found")
+                    {
+                        // Clear authentication and force re-login
+                        await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        return Results.Redirect("/login");
+                    }
+                }
+
+                // If already authenticated and no errors, go to profile
+                if (context.User.Identity.IsAuthenticated)
                 {
                     return Results.Redirect("/profile");
                 }
 
                 // Check for error parameters
-                var error = context.Request.Query["error"].FirstOrDefault();
                 if (!string.IsNullOrEmpty(error))
                 {
                     var errorMessage = error switch
@@ -31,11 +42,7 @@ namespace defconflix.Endpoints
 
                 await context.ChallengeAsync("GitHub", new AuthenticationProperties
                 {
-                    RedirectUri = "/profile",
-                    Items =
-                    {
-                        { "scheme", "GitHub" }
-                    }
+                    RedirectUri = "/profile"
                 });
 
                 return Results.Empty;

@@ -11,11 +11,14 @@ namespace defconflix.Endpoints
                 GitHub OAuth API with JWT and Rate Limiting
     
                 Authentication Endpoints:
-                - GET /login - Start GitHub OAuth flow (WIP)
+                - GET /login - Start GitHub OAuth flow
                 - GET /profile - View profile, API key and JWT token (requires GitHub OAuth)
                 - POST /api/reset-key - Reset API key (requires GitHub OAuth)
                 - POST /api/auth/token - Get JWT token using API key
                 - GET /logout - Logout
+
+                * Note to myself or to any potential helper:
+                - RefreshToken is not implemented, yet.
     
                 Protected Endpoints (require Bearer token or X-API-Key header):
                 - GET /api/protected/user-info - Get user information
@@ -23,16 +26,16 @@ namespace defconflix.Endpoints
                 - POST /api/vttfile - Initialize the processing of files
                 - POST /api/vttcue - Updating the database along your processing on-demand
 
-                Admin Endpoints (require JWT token):
-                - GET /api/admin/users - List all users
-
-                Public Access:
-                - GET /api/users
-                - GET /api/files/{type} - mp4, pdf, srt, txt are the current options available.
-                - GET /api/files/{type}?page=5&pagesize=20 - pagination available.
+                Endpoints that requires GitHub OAuth:
                 - GET /api/file/{id} - this provides the detail of a file.
                 - GET /api/files/download?ids=1,2,3... - This handles up to 20 Ids. It downloads a text file.                
                 - POST /api/files/download - This expects to have in the body request: Ids[] where you can enter more than 20.
+                - GET /api/admin/dashboard - Admin dashboard with stats. (Just an idea for now)
+                - GET /api/users - List all users with pagination.
+
+                Public Access:
+                - GET /api/files/{type} - mp4, pdf, srt, txt are the current options available.
+                - GET /api/files/{type}?page=5&pagesize=20 - pagination available.
                 - GET /api/tools/downloader - This provides a script to download the videos inside of a text file.               
     
                 Rate Limits:

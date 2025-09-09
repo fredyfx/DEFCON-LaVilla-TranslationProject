@@ -10,40 +10,83 @@ namespace defconflix.Endpoints
     {
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapGet("/profile", async (HttpContext context, ApiContext db, IJwtTokenService jwtService) =>
+            app.MapGet("/profile", async (HttpContext context, ApiContext db, IJwtTokenService jwtService, ILogger<Profile> logger) =>
             {
                 if (!context.User.Identity.IsAuthenticated)
                 {
+                    logger.LogWarning("Unauthenticated user attempted to access profile");
                     return Results.Redirect("/login");
                 }
 
                 var githubId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
+                var email = context.User.FindFirst(ClaimTypes.Email)?.Value;
+
+                logger.LogInformation("Profile access attempt - GitHubId: {GitHubId}, Username: {Username}, Email: {Email}",
+                    githubId, username, email);
 
                 if (string.IsNullOrEmpty(githubId))
                 {
-                    return Results.Redirect("/login?error=invalid_session");
+                    logger.LogError("GitHub ID claim is null or empty");
+                    return Results.Redirect("/logout"); // Force re-authentication
                 }
 
-                var user = await db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubId);
+                var existingUser = await db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubId);
 
-                if (user == null)
+                if (existingUser == null)
                 {
-                    return Results.Redirect("/login?error=user_not_found");
+                    logger.LogWarning("User not found in database for GitHubId: {GitHubId}", githubId);
+
+                    // Check if this is a creation failure vs missing user
+                    var userCount = await db.Users.CountAsync(u => u.Username == username);
+                    if (userCount > 0)
+                    {
+                        logger.LogError("Username {Username} exists but with different GitHubId", username);
+                        return Results.Problem("Account mismatch detected. Please contact support.");
+                    }
+
+                    // Attempt to create user
+                    try
+                    {
+                        var newUser = new User
+                        {
+                            GitHubId = githubId,
+                            Username = username ?? "unknown",
+                            Email = email ?? "",
+                            ApiKey = Guid.NewGuid().ToString(),
+                            CreatedAt = DateTime.UtcNow,
+                            IsActive = true
+                        };
+
+                        db.Users.Add(newUser);
+                        await db.SaveChangesAsync();
+
+                        logger.LogInformation("Created new user: {GitHubId}, {Username}", githubId, username);
+                        existingUser = newUser;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to create user for GitHubId: {GitHubId}", githubId);
+                        return Results.Problem("Failed to create user account. Please try again.");
+                    }
                 }
 
                 // Generate JWT token
-                var token = jwtService.GenerateToken(user);
-
-                return Results.Json(new
-                {
-                    Username = user.Username,
-                    Email = user.Email,
-                    ApiKey = user.ApiKey,
-                    JwtToken = token,
-                    CreatedAt = user.CreatedAt,
-                    LastAccessed = user.LastAccessedAt
-                });
+                var token = jwtService.GenerateToken(existingUser);
+                var loggedUser = new LoggedUser(
+                    existingUser.Username,
+                    existingUser.Email,
+                    existingUser.ApiKey,
+                    token,
+                    existingUser.CreatedAt,
+                    existingUser.LastAccessedAt
+                );
+                existingUser.LastAccessedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+                return Results.Json(loggedUser);
             }).RequireRateLimiting("AuthPolicy");
         }
     }
+
+    internal record LoggedUser(string Username, string Email, string ApiKey, string JwtToken, DateTime CreatedAt, DateTime? LastAccessed);
 }

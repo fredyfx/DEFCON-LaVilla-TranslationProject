@@ -14,14 +14,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor |
                               Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto |
                               Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost;
-
-    // Clear known networks and proxies to allow Cloudflare IPs
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-
-    // Trust all proxies when using Cloudflare (they use many IP ranges)
-    options.RequireHeaderSymmetry = false;
-    options.ForwardLimit = null; // Allow unlimited forwarded IPs
 });
 
 // Add PostgreSQL database
@@ -51,7 +43,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseForwardedHeaders();
-
 
 // Middleware
 app.UseRateLimiter();

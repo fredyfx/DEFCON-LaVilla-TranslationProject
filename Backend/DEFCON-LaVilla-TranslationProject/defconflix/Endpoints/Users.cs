@@ -38,7 +38,7 @@ namespace defconflix.Endpoints
                         HasNextPage = page < totalPages
                     }
                 });
-            });
+            }).RequireAuthorization();
         }
     }
 }

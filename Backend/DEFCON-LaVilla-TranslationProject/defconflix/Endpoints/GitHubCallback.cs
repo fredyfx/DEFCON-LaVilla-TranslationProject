@@ -14,14 +14,11 @@ namespace defconflix.Endpoints
         {
             app.MapGet("/signin-github", async (HttpContext context, ApiContext db, IJwtTokenService jwtService) =>
             {
-                // This endpoint is automatically called by the OAuth middleware
-                // The authentication has already happened, we just need to process the user
-
                 if (!context.User.Identity.IsAuthenticated)
                 {
                     return Results.Redirect("/login?error=authentication_failed");
                 }
-
+                
                 var githubId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var username = context.User.FindFirst(ClaimTypes.Name)?.Value;
                 var email = context.User.FindFirst(ClaimTypes.Email)?.Value;
