@@ -9,21 +9,21 @@ namespace defconflix.Endpoints
         {
             app.MapGet("/index.php", async (HttpContext context, string? text = "LAVILLA") =>
             {
-                context.Response.ContentType = "text/plain; charset=utf-8";
-                
-                // Banner intro
-                await TypeText(context, GenerateTypingBanner(), 50);
-                await Task.Delay(1000, context.RequestAborted);
-
-                // DEFCON La Villa Hacker
+                context.Response.ContentType = "text/plain; charset=utf-8";                
                 await context.Response.WriteAsync("\x1b[2J\x1b[H");
                 await context.Response.Body.FlushAsync();
-                await TypeText(context, GenerateAnimatedFrames(), 20);
-                await Task.Delay(1500, context.RequestAborted);
+
+                // Banner intro
+                await TypeText(context, GenerateTypingBanner(), 5);
+                await Task.Delay(500, context.RequestAborted);
+
+                // DEFCON La Villa Hacker
+                await TypeText(context, GenerateAnimatedFrames(), 2);
+                await Task.Delay(500, context.RequestAborted);
 
                 // Footer
-                await TypeText(context, GenerateAsciiArtFooter(), 30);
-                await Task.Delay(1000, context.RequestAborted);
+                await TypeText(context, GenerateAsciiArtFooter(), 3);
+                await Task.Delay(500, context.RequestAborted);
 
                 // End
                 await TypeText(context, "\n\n            [TRANSMISSION COMPLETE]", 100);
