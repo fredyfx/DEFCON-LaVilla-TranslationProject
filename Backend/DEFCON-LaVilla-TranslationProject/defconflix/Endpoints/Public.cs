@@ -13,9 +13,9 @@ namespace defconflix.Endpoints
                 Authentication Endpoints:
                 - GET /login - Start GitHub OAuth flow
                 - GET /profile - View profile, API key and JWT token (requires GitHub OAuth)
+                - GET /logout - Logout
                 - POST /api/reset-key - Reset API key (requires GitHub OAuth)
                 - POST /api/auth/token - Get JWT token using API key
-                - GET /logout - Logout
 
                 * Note to myself or to any potential helper:
                 - RefreshToken is not implemented, yet.
@@ -28,14 +28,16 @@ namespace defconflix.Endpoints
 
                 Endpoints that requires GitHub OAuth:
                 - GET /api/file/{id} - this provides the detail of a file.
+                - GET /api/file/search/{filename} - search by filename (exact match).
+                - GET /api/files/{type} - List by mp4, pdf, srt, txt are the current options available.
+                - GET /api/files/{type}?page=5&pagesize=20 - pagination available.
+                - GET /api/files/{type}/search/{term} - search inside the text files (case insensitive).
                 - GET /api/files/download?ids=1,2,3... - This handles up to 20 Ids. It downloads a text file.                
                 - POST /api/files/download - This expects to have in the body request: Ids[] where you can enter more than 20.
                 - GET /api/admin/dashboard - Admin dashboard with stats. (Just an idea for now)
                 - GET /api/users - List all users with pagination.
 
                 Public Access:
-                - GET /api/files/{type} - mp4, pdf, srt, txt are the current options available.
-                - GET /api/files/{type}?page=5&pagesize=20 - pagination available.
                 - GET /api/tools/downloader - This provides a script to download the videos inside of a text file.               
     
                 Rate Limits:

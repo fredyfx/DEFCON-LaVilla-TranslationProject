@@ -70,7 +70,7 @@ namespace defconflix.Endpoints
                         HasNextPage = page < totalPages
                     }
                 });
-            });
+            }).RequireAuthorization();
 
             app.MapGet("/api/file/{id}", async (ApiContext db, int id) =>
             {
@@ -82,6 +82,90 @@ namespace defconflix.Endpoints
                 return Results.Json(new
                 {
                     File = file
+                });
+            }).RequireAuthorization();
+
+            app.MapGet("/api/file/search/{filename}", async (ApiContext db, string filename) =>
+            {
+                if (string.IsNullOrWhiteSpace(filename))
+                {
+                    return Results.BadRequest("Search file name cannot be empty");
+                }
+
+                var file = await db.Files
+                    .Where(f => f.File_Name == filename)
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
+                    .SingleOrDefaultAsync();
+
+                if (file == null)
+                {
+                    return Results.NotFound($"File Name: '{filename}' not found");
+                }
+
+                return Results.Json(new
+                {
+                    File = file
+                });
+            }).RequireAuthorization();
+
+            app.MapGet("/api/files/{type}/search/{term}", async (ApiContext db, string type, string term, int page = 1, int pageSize = 10) =>
+            {
+                // Validate pagination parameters
+                page = Math.Max(1, page);
+                pageSize = Math.Clamp(pageSize, 1, 50);
+
+                Expression<Func<Files, bool>> filterFiles = f => true;
+                Expression<Func<Files, bool>> filterVideos = f => f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterPdfs = f => f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterSRTs = f => f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterTxts = f => f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+
+                // Apply the appropriate filter based on the requested file type using switch expression
+                var filter = type.ToLower() switch
+                {
+                    "mp4" => filterVideos,
+                    "pdf" => filterPdfs,
+                    "srt" => filterSRTs,
+                    "txt" => filterTxts,
+                    _ => filterFiles // Default case, should not be hit due to earlier validation
+                };
+
+                // Create case-insensitive search for partial matches
+                var searchTerm = term.Trim();
+
+                if (string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    return Results.BadRequest("Search term cannot be empty");
+                }
+
+                var query = db.Files
+                    .Where(filter)
+                    .Where(f => EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"))
+                    .OrderBy(f => f.File_Name.Length) // Shorter names first (more relevant)
+                    .ThenBy(f => f.File_Name);
+           
+                var totalCount = await query.CountAsync();
+                var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+                var files = await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
+                    .ToListAsync();
+
+                return Results.Json(new
+                {
+                    SearchTerm = searchTerm,
+                    Files = files,
+                    Pagination = new
+                    {
+                        CurrentPage = page,
+                        PageSize = pageSize,
+                        TotalPages = totalPages,
+                        TotalFiles = totalCount,
+                        HasPreviousPage = page > 1,
+                        HasNextPage = page < totalPages
+                    }
                 });
             }).RequireAuthorization();
 
