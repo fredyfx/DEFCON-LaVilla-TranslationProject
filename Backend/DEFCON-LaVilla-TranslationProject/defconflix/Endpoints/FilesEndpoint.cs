@@ -1,6 +1,7 @@
 ﻿using defconflix.Data;
 using defconflix.Interfaces;
 using defconflix.Models;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text;
@@ -13,8 +14,8 @@ namespace defconflix.Endpoints
         public record FileDTO(int Id, string FileName, string Status);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            //api/files/txt?page=5&pagesize=20
-            app.MapGet("/api/files/{type}", async (ApiContext db, string type, int page = 1, int pageSize = 10) =>
+
+            async Task<IResult> GetFilesByType(ApiContext db, string type, int page = 1, int pageSize = 10)
             {
                 // Validation for type parameter
                 var fileTypeRequested = type.ToLower();
@@ -70,9 +71,9 @@ namespace defconflix.Endpoints
                         HasNextPage = page < totalPages
                     }
                 });
-            }).RequireAuthorization();
+            }
 
-            app.MapGet("/api/file/{id}", async (ApiContext db, int id) =>
+            async Task<IResult> GetFileById(ApiContext db, int id)
             {
                 var file = await db.Files
                     .Where(f => f.Id == id)
@@ -83,9 +84,9 @@ namespace defconflix.Endpoints
                 {
                     File = file
                 });
-            }).RequireAuthorization();
+            }
 
-            app.MapGet("/api/file/search/{filename}", async (ApiContext db, string filename) =>
+            async Task<IResult> GetSearchExactFileName(ApiContext db, string filename)
             {
                 if (string.IsNullOrWhiteSpace(filename))
                 {
@@ -106,9 +107,9 @@ namespace defconflix.Endpoints
                 {
                     File = file
                 });
-            }).RequireAuthorization();
+            }
 
-            app.MapGet("/api/files/{type}/search/{term}", async (ApiContext db, string type, string term, int page = 1, int pageSize = 10) =>
+            async Task<IResult> GetSearchFilesByTypeAndTerm(ApiContext db, string type, string term, int page = 1, int pageSize = 10)
             {
                 // Validate pagination parameters
                 page = Math.Max(1, page);
@@ -143,7 +144,7 @@ namespace defconflix.Endpoints
                     .Where(f => EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"))
                     .OrderBy(f => f.File_Name.Length) // Shorter names first (more relevant)
                     .ThenBy(f => f.File_Name);
-           
+
                 var totalCount = await query.CountAsync();
                 var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
@@ -167,9 +168,9 @@ namespace defconflix.Endpoints
                         HasNextPage = page < totalPages
                     }
                 });
-            }).RequireAuthorization();
+            }
 
-            app.MapPost("/api/files/download", async (ApiContext db, BulkDownloadRequest request) =>
+            async Task<IResult> GetLargeFilesLocationsToDownload(ApiContext db, BulkDownloadRequest request)
             {
                 // Validate input
                 if (request.Ids == null || request.Ids.Length == 0)
@@ -226,9 +227,9 @@ namespace defconflix.Endpoints
                     // Log the exception if you have logging configured
                     return Results.Problem("An error occurred while processing the request.");
                 }
-            }).RequireAuthorization();
+            }
 
-            app.MapGet("/api/files/download", async (ApiContext db, string ids) =>
+            async Task<IResult> GetSmallFilesLocationsToDownload(ApiContext db, string ids)
             {
                 // Parse comma-separated Ids from query parameter
                 if (string.IsNullOrEmpty(ids))
@@ -293,7 +294,21 @@ namespace defconflix.Endpoints
                     // Log the exception if you have logging configured
                     return Results.Problem("An error occurred while processing the request.");
                 }
-            }).RequireAuthorization();
+            }
+
+            //api/files/txt?page=5&pagesize=20
+            app.MapGet("/api/files/{type}", GetFilesByType)
+                .RequireAuthorization();
+            app.MapGet("/api/file/{id}", GetFileById)
+                .RequireAuthorization();
+            app.MapGet("/api/file/search/{filename}", GetSearchExactFileName)
+                .RequireAuthorization();
+            app.MapGet("/api/files/{type}/search/{term}", GetSearchFilesByTypeAndTerm)
+                .RequireAuthorization();
+            app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload)
+                .RequireAuthorization();
+            app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload)
+                .RequireAuthorization();
         }
 
         static string GetFTPLocation(string filePath)
