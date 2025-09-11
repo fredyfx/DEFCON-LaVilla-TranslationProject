@@ -10,46 +10,23 @@ namespace defconflix.Endpoints
             app.MapGet("/index.php", async (HttpContext context, string? text = "LAVILLA") =>
             {
                 context.Response.ContentType = "text/plain; charset=utf-8";
-                context.Response.Headers.Add("Transfer-Encoding", "chunked");
+                
+                // Banner intro
+                await TypeText(context, GenerateTypingBanner(), 50);
+                await Task.Delay(1000, context.RequestAborted);
 
-                var banner = GenerateTypingBanner();
-                var linesInBanner = banner.Split('\n');
-
-                foreach (var line in linesInBanner)
-                {
-                    if (context.RequestAborted.IsCancellationRequested)
-                        break;
-
-                    await context.Response.WriteAsync(line + "\n");
-                    await context.Response.Body.FlushAsync();
-                    await Task.Delay(500, context.RequestAborted);
-                }
-
-                var frames = GenerateAnimatedFrames();
-                var linesInFrames = frames.Split('\n');
+                // DEFCON La Villa Hacker
                 await context.Response.WriteAsync("\x1b[2J\x1b[H");
-                foreach (var line in linesInFrames)
-                {
-                    if (context.RequestAborted.IsCancellationRequested)
-                        break;
-
-                    await context.Response.WriteAsync(line + "\n");
-                    await context.Response.Body.FlushAsync();
-                    await Task.Delay(500, context.RequestAborted);
-                }
-                var footer = GenerateAsciiArtFooter();
-                var linesInFooter = footer.Split('\n');
-                foreach (var line in linesInFooter)
-                {
-                    if (context.RequestAborted.IsCancellationRequested)
-                        break;
-
-                    await context.Response.WriteAsync(line + "\n");
-                    await context.Response.Body.FlushAsync();
-                    await Task.Delay(500, context.RequestAborted);
-                }
-                await context.Response.WriteAsync("\n\n            [TRANSMISSION COMPLETE]");
                 await context.Response.Body.FlushAsync();
+                await TypeText(context, GenerateAnimatedFrames(), 20);
+                await Task.Delay(1500, context.RequestAborted);
+
+                // Footer
+                await TypeText(context, GenerateAsciiArtFooter(), 30);
+                await Task.Delay(1000, context.RequestAborted);
+
+                // End
+                await TypeText(context, "\n\n            [TRANSMISSION COMPLETE]", 100);
             });
         }
 
@@ -57,11 +34,11 @@ namespace defconflix.Endpoints
         {
             // Simple ASCII art generator - you can replace with more sophisticated libraries
             var result = new StringBuilder();
-
+            result.AppendLine();
             result.AppendLine("            ╔══════════════════════════════════════════════════════════════╗");
-            result.AppendLine("            ║               🔥 DEFCON La Villa Hacker 🔥                  ║");
+            result.AppendLine("                           🔥 DEFCON La Villa Hacker 🔥                    ");
             result.AppendLine("            ╠══════════════════════════════════════════════════════════════╣");
-            result.AppendLine("            ╠                   ...What are you looking for?               ╣");
+            result.AppendLine("                               ...What are you looking for?                 ");
             result.AppendLine("            ╚══════════════════════════════════════════════════════════════╝");
             result.AppendLine($"            Generated at: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 
@@ -81,8 +58,9 @@ namespace defconflix.Endpoints
                 ░  ██████  ███████ ██       ██████  ██████  ██   ████ ░
                 ░                                                     ░
                 ░                 La Villa Hacker                     ░
-                ░            🏴‍☠️ Hackers Hispanos! 🏴‍☠️              ░
+                ░            🏴‍☠️ Hackers Hispanos! 🏴‍☠️          ░
                 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+                
                 ";
         }
 
@@ -90,12 +68,25 @@ namespace defconflix.Endpoints
         {
             return @"
             ╔════════════════════════════════════════════════════════════════╗
-            ║                      🔐 SECURE TERMINAL 🔐                     ║
-            ║                     Connection Established                     ║
+                                   🔐 SECURE TERMINAL 🔐                    
+                                  Connection Established                     
             ╚════════════════════════════════════════════════════════════════╝
     
             > Initializing transmission...
             > ";
+        }
+
+        private static async Task TypeText(HttpContext context, string text, int delayMs)
+        {
+            foreach (char c in text)
+            {
+                if (context.RequestAborted.IsCancellationRequested)
+                    break;
+
+                await context.Response.WriteAsync(c.ToString());
+                await context.Response.Body.FlushAsync();
+                await Task.Delay(delayMs, context.RequestAborted);
+            }
         }
     }
 }
