@@ -2,6 +2,7 @@
 using defconflix.Filters;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -223,10 +224,29 @@ namespace defconflix.Extensions
             {
                 options.AddPolicy("AdminOnly", policy =>
                     policy.Requirements.Add(new AdminRequirement()));
+
+                options.AddPolicy("BearerOnly", policy =>
+                {
+                    policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+                    policy.RequireAuthenticatedUser();
+                });
+                                
+                options.AddPolicy("AdminBearerOnly", policy =>
+                {
+                    policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+                    policy.Requirements.Add(new AdminRequirement());
+                });
+
+                options.AddPolicy("ApiAccess", policy =>
+                {
+                    policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+                    policy.RequireAuthenticatedUser();
+                });
             });
 
             // Register the authorization handler
             services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
+            services.AddScoped<IAuthorizationHandler, ApiAccessAuthorizationHandler>();
             return services;
         }
     }

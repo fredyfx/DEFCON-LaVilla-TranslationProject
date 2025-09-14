@@ -40,7 +40,7 @@ namespace defconflix.Endpoints
                 {
                     return Results.Problem($"Error starting file check job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthenticatedPolicy");
 
             // Start a job to check all files
@@ -65,7 +65,7 @@ namespace defconflix.Endpoints
                 {
                     return Results.Problem($"Error starting check-all job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthPolicy"); // More restrictive for bulk operations
 
             // Start a job to check files that need checking (not checked in 24h)
@@ -89,7 +89,7 @@ namespace defconflix.Endpoints
                 {
                     return Results.Problem($"Error starting check-needed job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthenticatedPolicy");
 
             // Get job status
@@ -119,7 +119,7 @@ namespace defconflix.Endpoints
                     IsCompleted = job.IsCompleted,
                     StartedByUserId = job.StartedByUserId
                 });
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
 
             // Get all active jobs
             app.MapGet("/api/protected/files/jobs/active", async (IOnDemandFileCheckService jobService) =>
@@ -142,7 +142,7 @@ namespace defconflix.Endpoints
                     ActiveJobs = response.Count,
                     Jobs = response
                 });
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthenticatedPolicy");
 
             // Cancel a job
@@ -162,7 +162,7 @@ namespace defconflix.Endpoints
                     JobId = jobId,
                     CancelledAt = DateTime.UtcNow
                 });
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthenticatedPolicy");
 
             // Get queue status
@@ -174,7 +174,7 @@ namespace defconflix.Endpoints
                     IsEmpty = taskQueue.IsEmpty,
                     CheckedAt = DateTime.UtcNow
                 });
-            }).RequireAuthorization("AdminOnly");
+            }).RequireAuthorization("AdminApiAccess");
             //  .RequireRateLimiting("AuthenticatedPolicy");
         }
         private static int? GetUserIdFromContext(HttpContext context)
