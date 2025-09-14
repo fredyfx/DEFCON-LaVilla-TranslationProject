@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using defconflix.Data;
@@ -11,9 +12,11 @@ using defconflix.Data;
 namespace defconflix.Migrations
 {
     [DbContext(typeof(ApiContext))]
-    partial class ApiContextModelSnapshot : ModelSnapshot
+    [Migration("20250913182334_OptionalHash")]
+    partial class OptionalHash
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -24,11 +27,11 @@ namespace defconflix.Migrations
 
             modelBuilder.Entity("defconflix.Models.FileStatusCheck", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CheckedAt")
                         .ValueGeneratedOnAdd()
@@ -42,8 +45,8 @@ namespace defconflix.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<long>("FileId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("HttpStatusCode")
                         .HasColumnType("integer");
@@ -71,12 +74,12 @@ namespace defconflix.Migrations
 
             modelBuilder.Entity("defconflix.Models.Files", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
+                        .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("Created_At")
                         .HasColumnType("timestamp with time zone")
@@ -109,11 +112,11 @@ namespace defconflix.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_checked_at");
 
-                    b.Property<long>("ProcessedBy")
-                        .HasColumnType("bigint");
+                    b.Property<int>("ProcessedBy")
+                        .HasColumnType("integer");
 
-                    b.Property<long>("Size_Bytes")
-                        .HasColumnType("bigint")
+                    b.Property<int>("Size_Bytes")
+                        .HasColumnType("integer")
                         .HasColumnName("size_bytes");
 
                     b.Property<string>("Status")
@@ -161,11 +164,6 @@ namespace defconflix.Migrations
                     b.Property<DateTime?>("LastAccessedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("Role")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(2);
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -188,11 +186,11 @@ namespace defconflix.Migrations
 
             modelBuilder.Entity("defconflix.Models.VttCue", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CueId")
                         .HasMaxLength(50)
@@ -216,8 +214,8 @@ namespace defconflix.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<long>("VttFileId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("VttFileId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -234,19 +232,19 @@ namespace defconflix.Migrations
 
             modelBuilder.Entity("defconflix.Models.VttFile", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<long>("FileId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("FileId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("FileName")
                         .IsRequired()

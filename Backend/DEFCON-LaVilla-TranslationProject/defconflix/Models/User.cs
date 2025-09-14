@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using defconflix.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace defconflix.Models
 {
@@ -23,5 +24,6 @@ namespace defconflix.Models
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public DateTime? LastAccessedAt { get; set; }
+        public UserRole Role { get; set; } = UserRole.User;
     }
 }

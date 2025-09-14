@@ -13,6 +13,7 @@ namespace defconflix.Data
         public DbSet<VttCue> VttCues { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Files> Files { get; set; }
+        public DbSet<FileStatusCheck> FileStatusChecks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,13 @@ namespace defconflix.Data
 
             modelBuilder.Entity<Files>()
                 .HasKey(f => f.Id);
+
+            // Configure Files relationship with FileStatusChecks
+            modelBuilder.Entity<Files>()
+                .HasMany(f => f.StatusChecks)
+                .WithOne(s => s.File)
+                .HasForeignKey(s => s.FileId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.GitHubId)
@@ -36,6 +44,40 @@ namespace defconflix.Data
             modelBuilder.Entity<User>()
                 .Property(u => u.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Configure Role property
+            modelBuilder.Entity<User>()
+                .Property(u => u.Role)
+                .HasDefaultValue(defconflix.Enums.UserRole.User);
+
+            // Configure FileStatusCheck entity
+            modelBuilder.Entity<FileStatusCheck>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+
+                entity.Property(s => s.CheckedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(s => s.ErrorMessage)
+                    .HasMaxLength(500);
+
+                // Indexes for performance
+                entity.HasIndex(s => s.FileId);
+                entity.HasIndex(s => s.CheckedAt);
+                entity.HasIndex(s => s.IsAccessible);
+                entity.HasIndex(s => new { s.FileId, s.CheckedAt });
+
+                // Foreign key relationships
+                entity.HasOne(s => s.File)
+                    .WithMany(f => f.StatusChecks)
+                    .HasForeignKey(s => s.FileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(s => s.CheckedByUser)
+                    .WithMany()
+                    .HasForeignKey(s => s.CheckedByUserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
 
             // Configure VttFile entity
             modelBuilder.Entity<VttFile>(entity =>

@@ -7,10 +7,10 @@ namespace defconflix.Models
     {     
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
+        public long Id { get; set; }
              
         [Required]
-        public int VttFileId { get; set; }
+        public long VttFileId { get; set; }
                 
         [ForeignKey("VttFileId")]
         public virtual VttFile VttFile { get; set; } = null!;

@@ -9,8 +9,8 @@ namespace defconflix.Endpoints
 {
     public class VttFileEndpoint : IEndpoint
     {
-        public record VttFileRequest(string FileName, int Id, string Language);
-        public record VttFileResponse(int Id);
+        public record VttFileRequest(string FileName, long Id, string Language);
+        public record VttFileResponse(long Id);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
 

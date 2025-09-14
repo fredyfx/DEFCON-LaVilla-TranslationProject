@@ -16,11 +16,11 @@ namespace defconflix.Models
 
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         public string FileName { get; set; }
         public string Language { get; set; }
-        public int FileId { get; set; }
+        public long FileId { get; set; }
 
         public string Header { get; set; } = "WEBVTT";
 

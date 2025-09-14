@@ -63,6 +63,7 @@ namespace defconflix.Middleware
                 context.Items["UserId"] = user.Id;
                 context.Items["Username"] = user.Username;
                 context.Items["User"] = user;
+                context.Items["UserRole"] = user.Role;
             }
 
             await _next(context);

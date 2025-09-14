@@ -10,8 +10,8 @@ namespace defconflix.Endpoints
 {
     public class FilesEndpoint : IEndpoint
     {
-        public record BulkDownloadRequest(int[] Ids);
-        public record FileDTO(int Id, string FileName, string Status);
+        public record BulkDownloadRequest(long[] Ids);
+        public record FileDTO(long Id, string FileName, string Status);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
 
@@ -31,10 +31,10 @@ namespace defconflix.Endpoints
                 pageSize = Math.Clamp(pageSize, 1, 100); // Max 100 items per page
 
                 Expression<Func<Files, bool>> filterFiles = f => true;
-                Expression<Func<Files, bool>> filterVideos = f => f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterPdfs = f => f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterSRTs = f => f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterTxts = f => f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterVideos = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterPdfs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterSRTs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterTxts = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
 
                 // Apply the appropriate filter based on the requested file type using switch expression
                 var filter = type.ToLower() switch
@@ -116,10 +116,10 @@ namespace defconflix.Endpoints
                 pageSize = Math.Clamp(pageSize, 1, 50);
 
                 Expression<Func<Files, bool>> filterFiles = f => true;
-                Expression<Func<Files, bool>> filterVideos = f => f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterPdfs = f => f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterSRTs = f => f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterTxts = f => f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterVideos = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterPdfs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterSRTs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
+                Expression<Func<Files, bool>> filterTxts = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
 
                 // Apply the appropriate filter based on the requested file type using switch expression
                 var filter = type.ToLower() switch
@@ -238,7 +238,7 @@ namespace defconflix.Endpoints
                 }
 
                 var idsArray = ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                     .Select(h => int.Parse(h.Trim()))
+                                     .Select(h => long.Parse(h.Trim()))
                                      .ToArray();
 
                 if (idsArray.Length == 0)
@@ -255,7 +255,7 @@ namespace defconflix.Endpoints
                 {
                     // Get all files matching the provided Ids
                     var files = await db.Files
-                        .Where(f => idsArray.Contains(f.Id))
+                        .Where(f => idsArray.Contains(f.Id) && f.LastCheckAccessible == true)
                         .Select(f => new { f.Id, f.File_Path })
                         .ToListAsync();
 

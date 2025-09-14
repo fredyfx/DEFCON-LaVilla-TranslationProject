@@ -32,7 +32,9 @@ namespace defconflix.Services
                 new Claim("userId", user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Email, user.Email ?? ""),
-                new Claim("apiKey", user.ApiKey)
+                new Claim("apiKey", user.ApiKey),
+                new Claim("role", ((int)user.Role).ToString()),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             }),
                 Expires = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours),
                 Issuer = _jwtSettings.Issuer,

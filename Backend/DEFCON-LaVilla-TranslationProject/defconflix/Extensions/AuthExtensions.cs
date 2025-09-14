@@ -1,7 +1,9 @@
 ﻿using defconflix.Configurations;
+using defconflix.Filters;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
@@ -215,6 +217,16 @@ namespace defconflix.Extensions
                     }
                 };
             });
+
+            // Add Authorization with Admin policy
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("AdminOnly", policy =>
+                    policy.Requirements.Add(new AdminRequirement()));
+            });
+
+            // Register the authorization handler
+            services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
             return services;
         }
     }

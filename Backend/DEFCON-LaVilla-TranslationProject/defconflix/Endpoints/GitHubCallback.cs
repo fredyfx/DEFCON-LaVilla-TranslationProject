@@ -43,7 +43,8 @@ namespace defconflix.Endpoints
                             Email = email ?? "",
                             ApiKey = Guid.NewGuid().ToString(),
                             CreatedAt = DateTime.UtcNow,
-                            IsActive = true
+                            IsActive = true,
+                            Role = Enums.UserRole.User
                         };
 
                         db.Users.Add(newUser);

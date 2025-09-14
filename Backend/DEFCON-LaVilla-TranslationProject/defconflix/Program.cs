@@ -26,9 +26,16 @@ builder.Services.AddAuthFX(Configuration);
 builder.Services.AddRateLimiterFX(Configuration);
 builder.Services.AddAuthorization();
 
+// Add HttpClient for file checking (register as singleton, not scoped)
+builder.Services.AddHttpClient();
+
 // Add services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IFileTextService, FileTextService>();
+builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
+
+// Add Background Services
+builder.Services.AddFileCheckBackgroundService();
 
 // Adding Endpoints
 builder.Services.AddEndpoints();
