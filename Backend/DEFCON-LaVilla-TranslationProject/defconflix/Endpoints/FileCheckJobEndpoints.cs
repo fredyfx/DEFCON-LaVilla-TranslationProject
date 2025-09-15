@@ -7,11 +7,10 @@ namespace defconflix.Endpoints
         public record StartFileCheckJobRequest(long[] FileIds);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            // Start a file check job for specific files
-            app.MapPost("/api/protected/files/jobs/check-files", async (
+            async Task<IResult> CheckFiles (
                 HttpContext context,
                 IOnDemandFileCheckService jobService,
-                StartFileCheckJobRequest request) =>
+                StartFileCheckJobRequest request) 
             {
                 var userId = GetUserIdFromContext(context);
 
@@ -33,20 +32,18 @@ namespace defconflix.Endpoints
                         JobId = jobId,
                         Message = "File check job started successfully",
                         TotalFiles = request.FileIds.Length,
-                        StatusUrl = $"/api/protected/files/jobs/{jobId}/status"
+                        StatusUrl = $"/api/files/jobs/{jobId}/status"
                     });
                 }
                 catch (Exception ex)
                 {
                     return Results.Problem($"Error starting file check job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthenticatedPolicy");
+            }
 
-            // Start a job to check all files
-            app.MapPost("/api/protected/files/jobs/check-all", async (
+            async Task<IResult> CheckAll(
                 HttpContext context,
-                IOnDemandFileCheckService jobService) =>
+                IOnDemandFileCheckService jobService)
             {
                 var userId = GetUserIdFromContext(context);
 
@@ -65,13 +62,11 @@ namespace defconflix.Endpoints
                 {
                     return Results.Problem($"Error starting check-all job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthPolicy"); // More restrictive for bulk operations
+            }
 
-            // Start a job to check files that need checking (not checked in 24h)
-            app.MapPost("/api/protected/files/jobs/check-needed", async (
+            async Task<IResult> CheckNeeded(
                 HttpContext context,
-                IOnDemandFileCheckService jobService) =>
+                IOnDemandFileCheckService jobService)
             {
                 var userId = GetUserIdFromContext(context);
 
@@ -82,20 +77,18 @@ namespace defconflix.Endpoints
                     {
                         JobId = jobId,
                         Message = "Job started to check files that need checking",
-                        StatusUrl = $"/api/protected/files/jobs/{jobId}/status"
+                        StatusUrl = $"/api/files/jobs/{jobId}/status"
                     });
                 }
                 catch (Exception ex)
                 {
                     return Results.Problem($"Error starting check-needed job: {ex.Message}");
                 }
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthenticatedPolicy");
+            }
 
-            // Get job status
-            app.MapGet("/api/protected/files/jobs/{jobId}/status", async (
+            async Task<IResult> GetJobStatus(
                 string jobId,
-                IOnDemandFileCheckService jobService) =>
+                IOnDemandFileCheckService jobService)
             {
                 var job = await jobService.GetJobStatusAsync(jobId);
                 if (job == null)
@@ -119,10 +112,9 @@ namespace defconflix.Endpoints
                     IsCompleted = job.IsCompleted,
                     StartedByUserId = job.StartedByUserId
                 });
-            }).RequireAuthorization("AdminApiAccess");
+            }
 
-            // Get all active jobs
-            app.MapGet("/api/protected/files/jobs/active", async (IOnDemandFileCheckService jobService) =>
+            async Task<IResult> GetAllActiveJobs(IOnDemandFileCheckService jobService)
             {
                 var activeJobs = await jobService.GetActiveJobsAsync();
                 var response = activeJobs.Select(job => new
@@ -142,13 +134,11 @@ namespace defconflix.Endpoints
                     ActiveJobs = response.Count,
                     Jobs = response
                 });
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthenticatedPolicy");
+            }
 
-            // Cancel a job
-            app.MapPost("/api/protected/files/jobs/{jobId}/cancel", async (
+            async Task<IResult> CancelJob(
                 string jobId,
-                IOnDemandFileCheckService jobService) =>
+                IOnDemandFileCheckService jobService)
             {
                 var cancelled = await jobService.CancelJobAsync(jobId);
                 if (!cancelled)
@@ -162,11 +152,9 @@ namespace defconflix.Endpoints
                     JobId = jobId,
                     CancelledAt = DateTime.UtcNow
                 });
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthenticatedPolicy");
+            }
 
-            // Get queue status
-            app.MapGet("/api/protected/files/jobs/queue/status", (IBackgroundTaskQueue taskQueue) =>
+            IResult GetQueueStatus (IBackgroundTaskQueue taskQueue)
             {
                 return Results.Json(new
                 {
@@ -174,8 +162,42 @@ namespace defconflix.Endpoints
                     IsEmpty = taskQueue.IsEmpty,
                     CheckedAt = DateTime.UtcNow
                 });
-            }).RequireAuthorization("AdminApiAccess");
-            //  .RequireRateLimiting("AuthenticatedPolicy");
+            }
+
+            // Start a file check job for specific files
+            app.MapPost("/api/files/jobs/check-files", CheckFiles)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthPolicy");
+
+            // Start a job to check all files
+            app.MapPost("/api/files/jobs/check-all", CheckAll)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthPolicy");
+
+            // Start a job to check files that need checking (not checked in 24h)
+            app.MapPost("/api/files/jobs/check-needed", CheckNeeded)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            // Get job status
+            app.MapGet("/api/files/jobs/{jobId}/status", GetJobStatus)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            // Get all active jobs
+            app.MapGet("/api/files/jobs/active", GetAllActiveJobs)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            // Cancel a job
+            app.MapPost("/api/files/jobs/{jobId}/cancel", CancelJob)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            // Get queue status
+            app.MapGet("/api/files/jobs/queue/status", GetQueueStatus)
+                .RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
         }
         private static int? GetUserIdFromContext(HttpContext context)
         {

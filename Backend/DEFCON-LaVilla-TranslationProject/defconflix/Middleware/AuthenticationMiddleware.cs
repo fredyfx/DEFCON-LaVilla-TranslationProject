@@ -2,6 +2,7 @@ using defconflix.Data;
 using defconflix.Interfaces;
 using defconflix.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace defconflix.Middleware
 {
@@ -39,6 +40,21 @@ namespace defconflix.Middleware
                         if (int.TryParse(userId, out var id))
                         {
                             user = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.IsActive);
+                            if (user != null)
+                            {
+                                var claims = new List<Claim>
+                                {
+                                    new Claim("userId", user.Id.ToString()),
+                                    new Claim(ClaimTypes.Name, user.Username),
+                                    new Claim(ClaimTypes.Email, user.Email ?? ""),
+                                    new Claim("apiKey", user.ApiKey),
+                                    new Claim("role", ((int)user.Role).ToString()),
+                                    new Claim(ClaimTypes.Role, user.Role.ToString())
+                                };
+
+                                var identity = new ClaimsIdentity(claims, "Bearer");
+                                context.User = new ClaimsPrincipal(identity);
+                            }
                         }
                     }
                 }
@@ -46,6 +62,21 @@ namespace defconflix.Middleware
                 else if (!string.IsNullOrEmpty(apiKey))
                 {
                     user = await db.Users.FirstOrDefaultAsync(u => u.ApiKey == apiKey && u.IsActive);
+                    if (user != null)
+                    {
+                        var claims = new List<Claim>
+                        {
+                            new Claim("userId", user.Id.ToString()),
+                            new Claim(ClaimTypes.Name, user.Username),
+                            new Claim(ClaimTypes.Email, user.Email ?? ""),
+                            new Claim("apiKey", user.ApiKey),
+                            new Claim("role", ((int)user.Role).ToString()),
+                            new Claim(ClaimTypes.Role, user.Role.ToString())
+                        };
+
+                        var identity = new ClaimsIdentity(claims, "ApiKey");
+                        context.User = new ClaimsPrincipal(identity);
+                    }
                 }
 
                 if (user == null)

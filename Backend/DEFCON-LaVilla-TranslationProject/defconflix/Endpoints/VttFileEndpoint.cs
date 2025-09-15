@@ -13,8 +13,7 @@ namespace defconflix.Endpoints
         public record VttFileResponse(long Id);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-
-            app.MapGet("api/vttfile/export/{id}", async (ApiContext db, IFileTextService fileTextService, int id) =>
+            async Task<IResult> ExportVTTFile (ApiContext db, IFileTextService fileTextService, int id)
             {
                 var currentFile = await db.Files
                 .Where(x => x.Id == id)
@@ -27,9 +26,9 @@ namespace defconflix.Endpoints
                        contentType: "text/plain",
                        fileDownloadName: $"{currentFile.File_Name}.txt"
                    );
-            });
+            }
 
-            app.MapPost("/api/vttfile/completed/{id}", async (HttpContext context, ApiContext db, int id) =>
+            async Task<IResult> SetVTTAsCompleted(HttpContext context, ApiContext db, int id)
             {
                 var currentFile = await db.Files
                 .Where(x => x.Id == id && x.Status == "In Progress")
@@ -57,10 +56,9 @@ namespace defconflix.Endpoints
 
                 await db.SaveChangesAsync();
                 return Results.Ok();
-            }).RequireAuthorization()
-            .RequireRateLimiting("AuthenticatedPolicy");
+            }
 
-            app.MapPost("/api/vttfile/start", async (HttpContext context, ApiContext db, VttFileRequest request) =>
+            async Task<IResult> StartBuildingVTTFile(HttpContext context, ApiContext db, VttFileRequest request)
             {
                 var currentFile = await db.Files
                 .Where(x => x.Id == request.Id)
@@ -101,8 +99,19 @@ namespace defconflix.Endpoints
 
                 var response = new VttFileResponse(Id: vtt.Id);
                 return Results.Json(response);
-            }).RequireAuthorization()
-            .RequireRateLimiting("AuthenticatedPolicy");
+            }
+
+            app.MapGet("api/vttfile/export/{id}", ExportVTTFile)
+                .RequireAuthorization("ApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            app.MapPost("/api/vttfile/completed/{id}", SetVTTAsCompleted)
+                .RequireAuthorization("ApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
+
+            app.MapPost("/api/vttfile/start", StartBuildingVTTFile)
+                .RequireAuthorization("ApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
         }
     }
 }

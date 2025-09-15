@@ -34,7 +34,7 @@ namespace defconflix.Endpoints
                 await db.VttCues.AddAsync(vttcue);
                 await db.SaveChangesAsync();
                 return Results.Ok();
-            }).RequireAuthorization()
+            }).RequireAuthorization("ApiAccess")
              .RequireRateLimiting("AuthenticatedPolicy");
         }
     }

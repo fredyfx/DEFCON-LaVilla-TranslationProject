@@ -9,7 +9,8 @@ namespace defconflix.Endpoints
             app.MapGet("/api/admin/dashboard", () =>
             {
                 return Results.Json(new { data = "WIP" });
-            }).RequireRateLimiting("AuthenticatedPolicy");
+            }).RequireAuthorization("AdminApiAccess")
+                .RequireRateLimiting("AuthenticatedPolicy");
         }
     }
 }

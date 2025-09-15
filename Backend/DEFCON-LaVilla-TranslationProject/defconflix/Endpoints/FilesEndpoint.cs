@@ -298,26 +298,26 @@ namespace defconflix.Endpoints
 
             //api/files/txt?page=5&pagesize=20
             app.MapGet("/api/files/{type}", GetFilesByType)
-                .RequireAuthorization();
+                .RequireAuthorization("ApiAccess");
 
             // api/file/74234
             app.MapGet("/api/file/{id}", GetFileById)
-                .RequireAuthorization();
+                .RequireAuthorization("ApiAccess");
 
             // api/file/search/Dirk-jan Mollema - Advanced Active Directory to Entra ID lateral movement techniques-demo sharepoint actor.mp4
             app.MapGet("/api/file/search/{filename}", GetSearchExactFileName)
-                .RequireAuthorization();
+                .RequireAuthorization("ApiAccess");
 
             // api/files/mp4/search/Launching Shells?page=1&pagesize=20
             app.MapGet("/api/files/{type}/search/{term}", GetSearchFilesByTypeAndTerm)
-                .RequireAuthorization();
+                .RequireAuthorization("ApiAccess");
 
             // api/files/download?ids=1,2,3,4...
             app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload)
-                .RequireAuthorization();
-            
+                .RequireAuthorization("ApiAccess");
+
             app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload)
-                .RequireAuthorization();
+                .RequireAuthorization("ApiAccess");
         }
 
         static string GetFTPLocation(string filePath)

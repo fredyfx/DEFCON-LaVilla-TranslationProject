@@ -27,6 +27,11 @@ namespace defconflix.Extensions
                 options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = "GitHub";
                 options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.AddScheme(ApiKeyAuthenticationSchemeOptions.DefaultScheme, scheme =>
+                {
+                    scheme.HandlerType = typeof(ApiKeyAuthenticationHandler);
+                    scheme.DisplayName = "API Key";
+                });
             }).AddJwtBearer(options =>
             {
                 options.RequireHttpsMetadata = true; // Set to true in production
@@ -230,7 +235,7 @@ namespace defconflix.Extensions
                     policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
                     policy.RequireAuthenticatedUser();
                 });
-                                
+
                 options.AddPolicy("AdminBearerOnly", policy =>
                 {
                     policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
@@ -239,14 +244,22 @@ namespace defconflix.Extensions
 
                 options.AddPolicy("ApiAccess", policy =>
                 {
-                    policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
-                    policy.RequireAuthenticatedUser();
+                    policy.AuthenticationSchemes.Add(ApiKeyAuthenticationSchemeOptions.DefaultScheme);
+                    policy.Requirements.Add(new ApiAccessRequirement());
+                });
+
+                options.AddPolicy("AdminApiAccess", policy =>
+                {
+                    policy.AuthenticationSchemes.Add(ApiKeyAuthenticationSchemeOptions.DefaultScheme);
+                    policy.Requirements.Add(new ApiAccessRequirement());
+                    policy.Requirements.Add(new AdminRequirement());
                 });
             });
 
             // Register the authorization handler
             services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
             services.AddScoped<IAuthorizationHandler, ApiAccessAuthorizationHandler>();
+            services.AddScoped<IAuthenticationHandler, ApiKeyAuthenticationHandler>();
             return services;
         }
     }
