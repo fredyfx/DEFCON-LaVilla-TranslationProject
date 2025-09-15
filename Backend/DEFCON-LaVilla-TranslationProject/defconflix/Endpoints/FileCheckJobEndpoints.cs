@@ -165,37 +165,37 @@ namespace defconflix.Endpoints
             }
 
             // Start a file check job for specific files
-            app.MapPost("/api/files/jobs/check-files", CheckFiles)
+            app.MapPost("/api/background/jobs/check-files", CheckFiles)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthPolicy");
 
             // Start a job to check all files
-            app.MapPost("/api/files/jobs/check-all", CheckAll)
+            app.MapPost("/api/background/jobs/check-all", CheckAll)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthPolicy");
 
             // Start a job to check files that need checking (not checked in 24h)
-            app.MapPost("/api/files/jobs/check-needed", CheckNeeded)
+            app.MapPost("/api/background/jobs/check-needed", CheckNeeded)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
 
             // Get job status
-            app.MapGet("/api/files/jobs/{jobId}/status", GetJobStatus)
+            app.MapGet("/api/background/jobs/{jobId}/status", GetJobStatus)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
 
             // Get all active jobs
-            app.MapGet("/api/files/jobs/active", GetAllActiveJobs)
+            app.MapGet("/api/background/jobs/active", GetAllActiveJobs)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
 
             // Cancel a job
-            app.MapPost("/api/files/jobs/{jobId}/cancel", CancelJob)
+            app.MapPost("/api/background/jobs/{jobId}/cancel", CancelJob)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
 
             // Get queue status
-            app.MapGet("/api/files/jobs/queue/status", GetQueueStatus)
+            app.MapGet("/api/background/jobs/queue/status", GetQueueStatus)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
         }
