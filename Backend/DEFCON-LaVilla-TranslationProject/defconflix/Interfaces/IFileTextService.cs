@@ -4,7 +4,7 @@ namespace defconflix.Interfaces
 {
     public interface IFileTextService
     {
-        Task<string?> GetPureTextAsync(int vttFileId, VttTextExtractionOptions? options = null);
-        Task<string?> GetPureTextByIdAsync(int id, VttTextExtractionOptions? options = null);
+        Task<string?> GetPureTextAsync(long vttFileId, VttTextExtractionOptions? options = null);
+        Task<string?> GetPureTextByIdAsync(long id, VttTextExtractionOptions? options = null);
     }
 }

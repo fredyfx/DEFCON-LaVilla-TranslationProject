@@ -14,7 +14,7 @@ namespace defconflix.Services
             _context = context;
         }
 
-        public async Task<string?> GetPureTextAsync(int vttFileId, VttTextExtractionOptions? options = null)
+        public async Task<string?> GetPureTextAsync(long vttFileId, VttTextExtractionOptions? options = null)
         {
             options ??= new VttTextExtractionOptions();
 
@@ -28,7 +28,7 @@ namespace defconflix.Services
             return vttFile.ExtractPureText(options);
         }
 
-        public async Task<string?> GetPureTextByIdAsync(int id, VttTextExtractionOptions? options = null)
+        public async Task<string?> GetPureTextByIdAsync(long id, VttTextExtractionOptions? options = null)
         {
             options ??= new VttTextExtractionOptions();
 
