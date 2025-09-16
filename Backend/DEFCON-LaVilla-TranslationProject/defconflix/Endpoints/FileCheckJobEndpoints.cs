@@ -54,7 +54,7 @@ namespace defconflix.Endpoints
                     {
                         JobId = jobId,
                         Message = "Job started to check all files",
-                        StatusUrl = $"/api/files/jobs/{jobId}/status",
+                        StatusUrl = $"/api/background/jobs/{jobId}/status",
                         Warning = "This may take a very long time depending on the number of files"
                     });
                 }
@@ -77,7 +77,7 @@ namespace defconflix.Endpoints
                     {
                         JobId = jobId,
                         Message = "Job started to check files that need checking",
-                        StatusUrl = $"/api/files/jobs/{jobId}/status"
+                        StatusUrl = $"/api/background/jobs/{jobId}/status"
                     });
                 }
                 catch (Exception ex)
