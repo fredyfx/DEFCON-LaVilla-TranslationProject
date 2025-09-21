@@ -14,6 +14,7 @@ namespace defconflix.Models
         public int FilesProcessed { get; set; }
         public string? ErrorMessage { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public int StartedByUserId { get; set; }
 
         public TimeSpan? Duration => EndTime.HasValue ? EndTime.Value - StartTime : DateTime.UtcNow - StartTime;
     }

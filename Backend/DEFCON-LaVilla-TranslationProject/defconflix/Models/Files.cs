@@ -25,7 +25,7 @@ namespace defconflix.Models
         public DateTime Created_At { get; set; }
         [Column("updated_at")]
         public DateTime? Updated_At { get; set; }
-        public long ProcessedBy { get; set; }
+        public long? ProcessedBy { get; set; }
 
         // New columns for file availability tracking
         [Column("last_check_accessible")]

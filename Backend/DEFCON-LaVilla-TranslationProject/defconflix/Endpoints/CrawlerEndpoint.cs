@@ -1,5 +1,6 @@
 ﻿using defconflix.Data;
 using defconflix.Interfaces;
+using defconflix.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace defconflix.Endpoints
@@ -9,14 +10,16 @@ namespace defconflix.Endpoints
         public record StartCrawlRequest(string BaseUrl);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapPost("/api/crawler/start", async (IWebCrawlerService crawlerService, StartCrawlRequest request) =>
+            app.MapPost("/api/crawler/start", async (HttpContext context, IWebCrawlerService crawlerService, StartCrawlRequest request) =>
             {
                 if (string.IsNullOrEmpty(request.BaseUrl) || !Uri.IsWellFormedUriString(request.BaseUrl, UriKind.Absolute))
                 {
                     return Results.BadRequest("Invalid URL provided");
                 }
 
-                var jobId = await crawlerService.StartCrawlAsync(request.BaseUrl);
+                var user = context.Items["User"] as User;
+
+                var jobId = await crawlerService.StartCrawlAsync(request.BaseUrl, user.Id);
                 return Results.Json(new { JobId = jobId, Message = "Crawling started" });
             }).RequireAuthorization("AdminApiAccess")
               .RequireRateLimiting("AuthenticatedPolicy");

@@ -37,13 +37,14 @@ namespace defconflix.Services
             return await _context.CrawlerJobs.FindAsync(jobId);
         }
 
-        public async Task<int> StartCrawlAsync(string baseUrl)
+        public async Task<int> StartCrawlAsync(string baseUrl, int userId)
         {
             var job = new CrawlerJob
             {
                 StartUrl = baseUrl,
                 Status = "Running",
-                StartTime = DateTime.UtcNow
+                StartTime = DateTime.UtcNow,
+                StartedByUserId = userId,
             };
 
             _context.CrawlerJobs.Add(job);
@@ -241,8 +242,7 @@ namespace defconflix.Services
                     LastCheckAccessible = true,
                     LastCheckedAt = DateTime.UtcNow,                    
                     Status = "Not started",
-                    Created_At = DateTime.UtcNow,
-                    ProcessedBy = 0
+                    Created_At = DateTime.UtcNow
                 };
 
                 context.Files.Add(file);
