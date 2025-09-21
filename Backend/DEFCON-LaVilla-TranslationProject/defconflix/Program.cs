@@ -1,4 +1,5 @@
 using defconflix.Data;
+using defconflix.Exceptions;
 using defconflix.Extensions;
 using defconflix.Interfaces;
 using defconflix.Middleware;
@@ -33,7 +34,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IFileTextService, FileTextService>();
 builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
-
+builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
 // Add Background Services
 builder.Services.AddFileCheckBackgroundService();
 

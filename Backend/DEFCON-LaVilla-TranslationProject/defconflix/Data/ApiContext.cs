@@ -14,6 +14,7 @@ namespace defconflix.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Files> Files { get; set; }
         public DbSet<FileStatusCheck> FileStatusChecks { get; set; }
+        public DbSet<CrawlerJob> CrawlerJobs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -140,6 +141,16 @@ namespace defconflix.Data
                 entity.HasIndex(c => new { c.VttFileId, c.StartTime });
                 entity.HasIndex(c => c.StartTime);
                 entity.HasIndex(c => c.EndTime);
+            });
+
+            modelBuilder.Entity<CrawlerJob>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.StartUrl).IsRequired().HasMaxLength(500);
+                entity.Property(c => c.Status).IsRequired().HasMaxLength(50);
+                entity.Property(c => c.ErrorMessage).HasMaxLength(1000);
+                entity.HasIndex(c => c.CreatedAt);
+                entity.HasIndex(c => c.Status);
             });
         }
     }
