@@ -54,6 +54,7 @@ namespace defconflix.Extensions
                 options.LogoutPath = "/logout";
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
                 options.SlidingExpiration = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 
                 // Important: Prevent redirect loops
                 options.Events.OnRedirectToLogin = context =>

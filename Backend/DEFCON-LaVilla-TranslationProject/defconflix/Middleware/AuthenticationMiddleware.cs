@@ -27,7 +27,15 @@ namespace defconflix.Middleware
                 using var scope = context.RequestServices.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApiContext>();
 
-                // Try JWT token first
+                if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    var githubId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    if (!string.IsNullOrEmpty(githubId))
+                    {
+                        user = await db.Users.FirstOrDefaultAsync(u => u.GitHubId == githubId && u.IsActive);
+                    }
+                }
+
                 if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
                 {
                     var token = authHeader.Substring("Bearer ".Length).Trim();
