@@ -12,6 +12,14 @@ namespace defconflix.Endpoints
         {
             app.MapGet("/profile", async (HttpContext context, ApiContext db, IJwtTokenService jwtService, ILogger<Profile> logger) =>
             {
+                // Check if request is from a web browser (Accept header contains text/html)
+                var acceptHeader = context.Request.Headers["Accept"].ToString();
+                if (acceptHeader.Contains("text/html"))
+                {
+                    // Redirect to Razor Page
+                    return Results.Redirect("/Profile");
+                }
+
                 if (!context.User.Identity.IsAuthenticated)
                 {
                     logger.LogWarning("Unauthenticated user attempted to access profile");

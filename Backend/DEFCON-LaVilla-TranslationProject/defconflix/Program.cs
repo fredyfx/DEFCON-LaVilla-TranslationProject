@@ -35,6 +35,7 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IFileTextService, FileTextService>();
 builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
+builder.Services.AddRazorPages();
 // Add Background Services
 builder.Services.AddFileCheckBackgroundService();
 // Add Custom Exception Handler
@@ -70,5 +71,5 @@ app.UseAuthorization();
 app.UseAuthenticationMiddleware();
 
 app.MapEndpoints();
-
+app.MapRazorPages();
 app.Run();

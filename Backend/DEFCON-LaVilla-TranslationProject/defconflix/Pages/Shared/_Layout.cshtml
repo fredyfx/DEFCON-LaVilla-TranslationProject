@@ -1,0 +1,85 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewData["Title"] - DEFCON Translation Project</title>
+    <link rel="stylesheet" href="https://unpkg.com/hack@0.2.1/hack.css">
+</head>
+<body>
+    <div class="main container">
+
+
+        <header>
+            <h1>🎯 DEFCON Translation Project</h1>
+            <nav class="main-nav">
+                <a href="/" class="@(ViewContext.RouteData.Values["Page"]?.ToString() == "/Index" ? "active" : "")">
+                    Dashboard
+                </a>
+                <a href="/Files" class="@(ViewContext.RouteData.Values["Page"]?.ToString()?.StartsWith("/Files") == true ? "active" : "")">
+                    Files
+                </a>
+                <a href="/Translation" class="@(ViewContext.RouteData.Values["Page"]?.ToString()?.StartsWith("/Translation") == true ? "active" : "")">
+                    Translation
+                </a>
+
+                <div class="nav-right">
+                    <partial name="_LoginPartial" />
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            @RenderBody()
+        </main>
+
+        <footer>
+            <p>
+                🏴‍☠️ La Villa Hacker @@ DEFCON |
+                <a href="/api/tools/downloader">Download Script</a> |
+                <a href="https://github.com/fredyfx/DEFCON-LaVilla-TranslationProject" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <style>
+        .main-nav {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            padding: 1rem 0;
+            border-bottom: 1px solid #333;
+            align-items: center;
+        }
+
+        .nav-right {
+            margin-left: auto;
+        }
+
+        .main-nav a {
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+        }
+
+            .main-nav a:hover,
+            .main-nav a.active {
+                border-color: #0f0;
+                background: rgba(0, 255, 0, 0.1);
+            }
+
+        .user-info {
+            font-size: 0.9rem;
+            color: #0f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+    </style>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

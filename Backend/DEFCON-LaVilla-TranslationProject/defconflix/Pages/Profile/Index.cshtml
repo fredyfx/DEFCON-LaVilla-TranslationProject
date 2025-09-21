@@ -1,0 +1,404 @@
+﻿@page
+@model defconflix.Pages.Profile.IndexModel
+@{
+    ViewData["Title"] = "Profile";
+}
+
+<div class="profile-container">
+    <div class="profile-header">
+        <h2>👤 User Profile</h2>
+        <div class="user-stats">
+            <span class="stat">
+                <strong>@Model.TranslationsCompleted</strong> Completed
+            </span>
+            <span class="stat">
+                <strong>@Model.TranslationsInProgress</strong> In Progress
+            </span>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert success">✅ @TempData["SuccessMessage"]</div>
+    }
+
+    <!-- User Information Section -->
+    <section class="profile-section">
+        <h3>📋 Account Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Username:</label>
+                <span>@Model.CurrentUser.Username</span>
+            </div>
+            <div class="info-item">
+                <label>Email:</label>
+                <span>@Model.CurrentUser.Email</span>
+            </div>
+            <div class="info-item">
+                <label>GitHub ID:</label>
+                <span>@Model.CurrentUser.GitHubId</span>
+            </div>
+            <div class="info-item">
+                <label>Account Created:</label>
+                <span>@Model.CurrentUser.CreatedAt.ToString("MMM dd, yyyy")</span>
+            </div>
+            <div class="info-item">
+                <label>Last Updated:</label>
+                <span>@(Model.CurrentUser.UpdatedAt?.ToString("MMM dd, yyyy HH:mm") ?? "Never")</span>
+            </div>
+            <div class="info-item">
+                <label>Last Accessed:</label>
+                <span>@(Model.CurrentUser.LastAccessedAt?.ToString("MMM dd, yyyy HH:mm") ?? "Never")</span>
+            </div>
+            <div class="info-item">
+                <label>Status:</label>
+                <span class="@(Model.CurrentUser.IsActive ? "status-active" : "status-inactive")">
+                    @(Model.CurrentUser.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Key Section -->
+    <section class="profile-section">
+        <h3>🔑 API Key</h3>
+        <p class="section-description">
+            Use this API key in the <code>X-API-Key</code> header for authenticated API requests.
+        </p>
+
+        <div class="key-container">
+            <div class="key-display">
+                <code id="apiKey" class="@(Model.ShowApiKey ? "" : "blurred")">
+                    @Model.CurrentUser.ApiKey
+                </code>
+                <button type="button" onclick="toggleApiKeyVisibility()" class="btn-icon" title="Toggle visibility">
+                    👁️
+                </button>
+                <button type="button" onclick="copyToClipboard('apiKey', 'API Key')" class="btn-icon" title="Copy to clipboard">
+                    📋
+                </button>
+            </div>
+
+            <form method="post" asp-page-handler="ResetApiKey" onsubmit="return confirm('Are you sure? This will invalidate your current API key!');">
+                <button type="submit" class="btn-warning">
+                    🔄 Reset API Key
+                </button>
+            </form>
+        </div>
+
+        <div class="usage-example">
+            <h4>Usage Example:</h4>
+            <pre><code>curl -H "X-API-Key: @Model.CurrentUser.ApiKey" \
+     https://infoconflix.com/api/protected/user-info</code></pre>
+        </div>
+    </section>
+
+    <!-- JWT Token Section -->
+    <section class="profile-section">
+        <h3>🎫 JWT Token</h3>
+        <p class="section-description">
+            Use this JWT token in the <code>Authorization: Bearer {token}</code> header.
+            <strong>Expires in 2 hours.</strong>
+        </p>
+
+        <div class="key-container">
+            <div class="key-display">
+                <code id="jwtToken" class="@(Model.ShowJwtToken ? "" : "blurred")" style="word-break: break-all;">
+                    @Model.JwtToken
+                </code>
+                <button type="button" onclick="toggleJwtVisibility()" class="btn-icon" title="Toggle visibility">
+                    👁️
+                </button>
+                <button type="button" onclick="copyToClipboard('jwtToken', 'JWT Token')" class="btn-icon" title="Copy to clipboard">
+                    📋
+                </button>
+            </div>
+
+            <form method="post" asp-page-handler="GenerateNewToken">
+                <button type="submit" class="btn-primary">
+                    🔄 Generate New Token
+                </button>
+            </form>
+        </div>
+
+        <div class="usage-example">
+            <h4>Usage Example:</h4>
+            <pre><code>curl -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \
+     https://your-api.com/api/protected/user-stats</code></pre>
+        </div>
+    </section>
+
+    <!-- API Endpoints Quick Reference -->
+    <section class="profile-section">
+        <h3>📡 API Endpoints Quick Reference</h3>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method">POST</span>
+                <code>/api/auth/token</code>
+                <span class="description">Get JWT token using API key</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method">POST</span>
+                <code>/api/vttfile/start</code>
+                <span class="description">Start translation</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method">POST</span>
+                <code>/api/vttcue</code>
+                <span class="description">Add VTT cue</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method">POST</span>
+                <code>/api/vttfile/completed/{id}</code>
+                <span class="description">Mark translation complete</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method">GET</span>
+                <code>/api/protected/user-info</code>
+                <span class="description">Get user information</span>
+            </div>
+        </div>
+        <a href="/" class="btn-secondary" style="margin-top: 1rem; display: inline-block;">
+            📖 View Full API Documentation
+        </a>
+    </section>
+</div>
+
+<style>
+    .profile-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .profile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .user-stats {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .stat {
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+    }
+
+        .stat strong {
+            font-size: 1.5rem;
+            color: #0f0;
+        }
+
+    .profile-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+        .profile-section h3 {
+            margin-top: 0;
+            color: #0f0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0.5rem;
+        }
+
+    .section-description {
+        color: #aaa;
+        font-size: 0.9rem;
+        margin: 0.5rem 0 1rem 0;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+        .info-item label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .info-item span {
+            font-family: monospace;
+        }
+
+    .status-active {
+        color: #0f0;
+    }
+
+    .status-inactive {
+        color: #f00;
+    }
+
+    .key-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .key-display {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+    }
+
+        .key-display code {
+            flex: 1;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+            .key-display code.blurred {
+                filter: blur(8px);
+                user-select: none;
+            }
+
+    .btn-icon {
+        background: none;
+        border: 1px solid #333;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+        .btn-icon:hover {
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+    .btn-primary, .btn-secondary, .btn-warning {
+        padding: 0.75rem 1.5rem;
+        border: 1px solid;
+        background: rgba(0, 255, 0, 0.1);
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary {
+        border-color: #0f0;
+        color: #0f0;
+    }
+
+    .btn-secondary {
+        border-color: #0ff;
+        color: #0ff;
+    }
+
+    .btn-warning {
+        border-color: #ff0;
+        color: #ff0;
+        background: rgba(255, 255, 0, 0.1);
+    }
+
+        .btn-primary:hover, .btn-secondary:hover, .btn-warning:hover {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+    .usage-example {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #333;
+    }
+
+        .usage-example h4 {
+            margin-top: 0;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .usage-example pre {
+            margin: 0.5rem 0 0 0;
+            overflow-x: auto;
+        }
+
+    .endpoints-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .endpoint-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .endpoint-item .method {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #0f0;
+        color: #0f0;
+        font-size: 0.75rem;
+        font-weight: bold;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    .endpoint-item code {
+        flex: 1;
+        color: #0ff;
+    }
+
+    .endpoint-item .description {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .alert {
+        padding: 1rem;
+        margin: 1rem 0;
+        border: 1px solid;
+    }
+
+    .alert.success {
+        border-color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+        color: #0f0;
+    }
+</style>
+
+<script>
+    function toggleApiKeyVisibility() {
+        const element = document.getElementById('apiKey');
+        element.classList.toggle('blurred');
+    }
+
+    function toggleJwtVisibility() {
+        const element = document.getElementById('jwtToken');
+        element.classList.toggle('blurred');
+    }
+
+    function copyToClipboard(elementId, name) {
+        const element = document.getElementById(elementId);
+        const text = element.textContent.trim();
+
+        navigator.clipboard.writeText(text).then(() => {
+            alert(`${name} copied to clipboard!`);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy to clipboard');
+        });
+    }
+</script>

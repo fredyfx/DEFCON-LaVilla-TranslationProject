@@ -1,0 +1,46 @@
+﻿@using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
+
+@if (User.Identity.IsAuthenticated)
+{
+    <div class="user-info">
+        <span>Welcome, @User.FindFirst(ClaimTypes.Name)?.Value!</span>
+        <a href="/Profile" title="Profile & API Keys">⚙️</a>
+        <a href="/logout" title="Logout">🚪</a>
+    </div>
+}
+else
+{
+    <div class="auth-links">
+        <a href="/login" class="login-btn">🐙 Login with GitHub</a>
+    </div>
+}
+
+<style>
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+        .user-info a {
+            text-decoration: none;
+            padding: 0.25rem;
+            border: 1px solid transparent;
+        }
+
+            .user-info a:hover {
+                border-color: #0f0;
+            }
+
+    .login-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #0f0;
+        text-decoration: none;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+        .login-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+        }
+</style>

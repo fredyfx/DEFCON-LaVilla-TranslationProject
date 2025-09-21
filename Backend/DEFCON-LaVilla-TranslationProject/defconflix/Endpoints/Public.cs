@@ -45,7 +45,7 @@ namespace defconflix.Endpoints
                 Authentication Endpoints:
                 ---------------------------------------
                 - GET  /login - Start GitHub OAuth flow
-                - GET  /profile - View profile, API key and JWT token (requires GitHub OAuth)
+                - GET  /profile - View profile, API key and JWT token (requires GitHub OAuth). Web Interface.
                 - GET  /logout - Logout
                 - POST /api/reset-key - Reset API key (requires GitHub OAuth)
                 - POST /api/auth/token - Get JWT token using API key

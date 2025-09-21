@@ -74,7 +74,7 @@ namespace defconflix.Endpoints
 
                     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal);
 
-                    return Results.Redirect("/profile");
+                    return Results.Redirect("/Profile");
                 }
                 catch (Exception ex)
                 {
