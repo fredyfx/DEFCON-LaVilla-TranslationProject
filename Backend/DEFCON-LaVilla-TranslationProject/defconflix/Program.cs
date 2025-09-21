@@ -37,9 +37,13 @@ builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
 // Add Background Services
 builder.Services.AddFileCheckBackgroundService();
-
+// Add Custom Exception Handler
+builder.Services.AddExceptionHandler<CustomExceptionHandler>();
 // Adding Endpoints
 builder.Services.AddEndpoints();
+
+// Add ProblemDetails for better error handling
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
@@ -51,6 +55,11 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseForwardedHeaders();
+
+if (builder.Environment.IsProduction())
+{
+    app.UseExceptionHandler();
+}
 
 // Middleware
 app.UseRateLimiter();
