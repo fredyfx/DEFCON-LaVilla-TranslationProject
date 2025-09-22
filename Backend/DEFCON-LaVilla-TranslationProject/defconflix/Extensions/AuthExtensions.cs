@@ -76,6 +76,7 @@ namespace defconflix.Extensions
                 options.ClientId = configuration["GitHub:ClientId"] ?? throw new InvalidOperationException("GitHub:ClientId not configured");
                 options.ClientSecret = configuration["GitHub:ClientSecret"] ?? throw new InvalidOperationException("GitHub:ClientSecret not configured");
                 options.CallbackPath = "/signin-github";
+                options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.Scope.Add("read:user");
                 options.SaveTokens = true;
                 options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";

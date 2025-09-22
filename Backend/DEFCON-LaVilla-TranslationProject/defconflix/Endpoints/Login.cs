@@ -24,7 +24,7 @@ namespace defconflix.Endpoints
                 // If already authenticated and no errors, go to profile
                 if (context.User.Identity.IsAuthenticated)
                 {
-                    return Results.Redirect("/profile");
+                    return Results.Redirect("/Profile");
                 }
 
                 // Check for error parameters
@@ -42,7 +42,7 @@ namespace defconflix.Endpoints
 
                 await context.ChallengeAsync("GitHub", new AuthenticationProperties
                 {
-                    RedirectUri = "/profile"
+                    RedirectUri = "/Profile"
                 });
 
                 return Results.Empty;

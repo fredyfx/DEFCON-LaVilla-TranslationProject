@@ -8,7 +8,6 @@ using System.Security.Claims;
 
 namespace defconflix.Pages.Profile
 {
-    [Authorize] // Require authentication for this page
     public class IndexModel : BasePageModel
     {
         private readonly ApiContext _context;
@@ -34,7 +33,7 @@ namespace defconflix.Pages.Profile
             var githubId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(githubId))
             {
-                return RedirectToPage("/Login");
+                return Redirect("/login");
             }
 
             CurrentUser = await _context.Users
@@ -42,7 +41,7 @@ namespace defconflix.Pages.Profile
 
             if (CurrentUser == null)
             {
-                return RedirectToPage("/Login");
+                return Redirect("/login");
             }
 
             // Generate fresh JWT token for display
@@ -65,7 +64,7 @@ namespace defconflix.Pages.Profile
 
             if (user == null)
             {
-                return RedirectToPage("/Login");
+                return Redirect("/login");
             }
 
             user.ApiKey = Guid.NewGuid().ToString();
@@ -84,7 +83,7 @@ namespace defconflix.Pages.Profile
 
             if (user == null)
             {
-                return RedirectToPage("/Login");
+                return Redirect("/login");
             }
 
             AddSuccessMessage("New JWT token generated!");

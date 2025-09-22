@@ -1,4 +1,5 @@
-﻿using defconflix.Interfaces;
+﻿using defconflix.Extensions;
+using defconflix.Interfaces;
 
 namespace defconflix.Endpoints
 {
@@ -12,7 +13,7 @@ namespace defconflix.Endpoints
                 IOnDemandFileCheckService jobService,
                 StartFileCheckJobRequest request) 
             {
-                var userId = GetUserIdFromContext(context);
+                var userId = context.GetCurrentUserId();
 
                 if (request.FileIds == null || request.FileIds.Length == 0)
                 {
@@ -45,7 +46,7 @@ namespace defconflix.Endpoints
                 HttpContext context,
                 IOnDemandFileCheckService jobService)
             {
-                var userId = GetUserIdFromContext(context);
+                var userId = context.GetCurrentUserId();
 
                 try
                 {
@@ -68,7 +69,7 @@ namespace defconflix.Endpoints
                 HttpContext context,
                 IOnDemandFileCheckService jobService)
             {
-                var userId = GetUserIdFromContext(context);
+                var userId = context.GetCurrentUserId();
 
                 try
                 {
@@ -198,10 +199,6 @@ namespace defconflix.Endpoints
             app.MapGet("/api/background/jobs/queue/status", GetQueueStatus)
                 .RequireAuthorization("AdminApiAccess")
                 .RequireRateLimiting("AuthenticatedPolicy");
-        }
-        private static int? GetUserIdFromContext(HttpContext context)
-        {
-            return context.Items["UserId"] as int?;
         }
     }
 }

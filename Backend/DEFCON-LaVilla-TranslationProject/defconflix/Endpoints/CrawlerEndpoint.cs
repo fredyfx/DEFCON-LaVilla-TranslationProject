@@ -1,6 +1,6 @@
 ﻿using defconflix.Data;
+using defconflix.Extensions;
 using defconflix.Interfaces;
-using defconflix.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace defconflix.Endpoints
@@ -17,9 +17,13 @@ namespace defconflix.Endpoints
                     return Results.BadRequest("Invalid URL provided");
                 }
 
-                var user = context.Items["User"] as User;
+                var userId = context.GetCurrentUserId();
+                if (userId == null)
+                {
+                    return Results.Unauthorized();
+                }
 
-                var jobId = await crawlerService.StartCrawlAsync(request.BaseUrl, user.Id);
+                var jobId = await crawlerService.StartCrawlAsync(request.BaseUrl, (int)userId);
                 return Results.Json(new { JobId = jobId, Message = "Crawling started" });
             }).RequireAuthorization("AdminApiAccess")
               .RequireRateLimiting("AuthenticatedPolicy");
@@ -43,7 +47,7 @@ namespace defconflix.Endpoints
                     Duration = job.Duration?.ToString(@"hh\:mm\:ss"),
                     job.CreatedAt
                 });
-            }).RequireAuthorization("AdminApiAccess")            
+            }).RequireAuthorization("AdminApiAccess")
             .RequireRateLimiting("AuthenticatedPolicy");
 
             app.MapGet("/api/crawler/jobs", async (IWebCrawlerService crawlerService) =>

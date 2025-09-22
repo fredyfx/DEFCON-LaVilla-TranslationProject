@@ -10,7 +10,7 @@ namespace defconflix.Endpoints
     {
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapGet("/profile", async (HttpContext context, ApiContext db, IJwtTokenService jwtService, ILogger<Profile> logger) =>
+            app.MapGet("/api/profile", async (HttpContext context, ApiContext db, IJwtTokenService jwtService, ILogger<Profile> logger) =>
             {
                 // Check if request is from a web browser (Accept header contains text/html)
                 var acceptHeader = context.Request.Headers["Accept"].ToString();

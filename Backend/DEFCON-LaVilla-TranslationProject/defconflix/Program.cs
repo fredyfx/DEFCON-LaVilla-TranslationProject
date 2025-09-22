@@ -64,11 +64,11 @@ if (builder.Environment.IsProduction())
 
 // Middleware
 app.UseRateLimiter();
+// Enhanced API Key and JWT authentication middleware
+app.UseAuthenticationMiddleware();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Enhanced API Key and JWT authentication middleware
-app.UseAuthenticationMiddleware();
 
 app.MapEndpoints();
 app.MapRazorPages();
