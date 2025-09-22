@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using defconflix.Data;
@@ -11,9 +12,11 @@ using defconflix.Data;
 namespace defconflix.Migrations
 {
     [DbContext(typeof(ApiContext))]
-    partial class ApiContextModelSnapshot : ModelSnapshot
+    [Migration("20250922065927_AddingUrlErrorTracking")]
+    partial class AddingUrlErrorTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,15 +33,6 @@ namespace defconflix.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CancellationReason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("CancellationRequestedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CancelledByUserId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -54,19 +48,6 @@ namespace defconflix.Migrations
 
                     b.Property<int>("FilesProcessed")
                         .HasColumnType("integer");
-
-                    b.Property<int>("FilesSuccessful")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("FilesWithErrors")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<bool>("IsCancellationRequested")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
@@ -86,13 +67,7 @@ namespace defconflix.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CancelledByUserId");
-
                     b.HasIndex("CreatedAt");
-
-                    b.HasIndex("IsCancellationRequested");
-
-                    b.HasIndex("StartedByUserId");
 
                     b.HasIndex("Status");
 
@@ -429,24 +404,6 @@ namespace defconflix.Migrations
                     b.HasIndex("FileName");
 
                     b.ToTable("VttFiles");
-                });
-
-            modelBuilder.Entity("defconflix.Models.CrawlerJob", b =>
-                {
-                    b.HasOne("defconflix.Models.User", "CancelledByUser")
-                        .WithMany()
-                        .HasForeignKey("CancelledByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("defconflix.Models.User", "StartedByUser")
-                        .WithMany()
-                        .HasForeignKey("StartedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CancelledByUser");
-
-                    b.Navigation("StartedByUser");
                 });
 
             modelBuilder.Entity("defconflix.Models.FileStatusCheck", b =>

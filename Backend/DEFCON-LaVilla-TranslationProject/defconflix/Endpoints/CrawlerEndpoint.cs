@@ -8,6 +8,7 @@ namespace defconflix.Endpoints
     public class CrawlerEndpoint : IEndpoint
     {
         public record StartCrawlRequest(string BaseUrl);
+        public record CancelJobRequest(string? Reason);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
             app.MapPost("/api/crawler/start", async (HttpContext context, IWebCrawlerService crawlerService, StartCrawlRequest request) =>
@@ -27,6 +28,53 @@ namespace defconflix.Endpoints
                 return Results.Json(new { JobId = jobId, Message = "Crawling started" });
             }).RequireAuthorization("AdminApiAccess")
               .RequireRateLimiting("AuthenticatedPolicy");
+
+            app.MapPost("/api/crawler/job/{id}/cancel", async (HttpContext context, ICrawlerCancellationService cancellationService, ApiContext db, int id, CancelJobRequest request) =>
+            {
+                var userId = context.GetCurrentUserId();
+                if (userId == null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                // Check if job exists and user has permission to cancel it
+                var job = await db.CrawlerJobs
+                    .Include(j => j.StartedByUser)
+                    .FirstOrDefaultAsync(j => j.Id == id);
+
+                if (job == null)
+                {
+                    return Results.NotFound("Crawler job not found");
+                }
+
+                // Allow cancellation if user started the job or is admin (you can add admin check here)
+                if (job.StartedByUserId != userId)
+                {
+                    return Results.Forbid();
+                }
+
+                if (!job.CanBeCancelled)
+                {
+                    return Results.BadRequest($"Job cannot be cancelled. Current status: {job.Status}");
+                }
+
+                var success = await cancellationService.RequestCancellationAsync(id, (int)userId, request.Reason);
+
+                if (success)
+                {
+                    return Results.Ok(new
+                    {
+                        Message = "Cancellation requested. Job will stop shortly.",
+                        JobId = id,
+                        Status = "Cancelling"
+                    });
+                }
+                else
+                {
+                    return Results.BadRequest("Failed to request cancellation");
+                }
+            }).RequireAuthorization("AdminApiAccess")
+            .RequireRateLimiting("AuthenticatedPolicy");
 
             app.MapGet("/api/crawler/job/{id}", async (IWebCrawlerService crawlerService, int id) =>
             {

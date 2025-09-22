@@ -1,7 +1,9 @@
 ﻿using defconflix.Data;
+using defconflix.Extensions;
 using defconflix.Interfaces;
 using defconflix.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Text.RegularExpressions;
 
 namespace defconflix.Services
@@ -12,17 +14,20 @@ namespace defconflix.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<WebCrawlerService> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly ICrawlerCancellationService _cancellationService;
 
         public WebCrawlerService(
-            ApiContext context, 
-            IHttpClientFactory httpClientFactory, 
-            ILogger<WebCrawlerService> logger, 
-            IServiceScopeFactory scopeFactory)
+            ApiContext context,
+            IHttpClientFactory httpClientFactory,
+            ILogger<WebCrawlerService> logger,
+            IServiceScopeFactory scopeFactory,
+            ICrawlerCancellationService cancellationService)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _scopeFactory = scopeFactory;
+            _cancellationService = cancellationService;
         }
 
         public async Task<List<CrawlerJob>> GetAllJobsAsync()
@@ -60,6 +65,7 @@ namespace defconflix.Services
         {
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApiContext>();
+            var cancellationService = scope.ServiceProvider.GetRequiredService<ICrawlerCancellationService>();
             var httpClient = _httpClientFactory.CreateClient();
 
             httpClient.Timeout = TimeSpan.FromSeconds(30);
@@ -69,6 +75,12 @@ namespace defconflix.Services
             var job = await context.CrawlerJobs.FindAsync(jobId);
             if (job == null) return;
 
+            // Initialize all counters to zero at start of crawl
+            job.FilesFound = 0;
+            job.FilesSuccessful = 0;
+            job.FilesWithErrors = 0;
+            job.FilesProcessed = 0;
+
             try
             {
                 var visitedUrls = new HashSet<string>();
@@ -77,6 +89,14 @@ namespace defconflix.Services
                 int filesFound = 0;
                 while (urlsToVisit.Count > 0)
                 {
+                    // Check for cancellation request at the start of each iteration
+                    if (await cancellationService.IsCancellationRequestedAsync(jobId))
+                    {
+                        _logger.LogInformation($"Cancellation detected for job {jobId}. Stopping crawl gracefully.");
+                        await cancellationService.MarkJobAsCancelledAsync(jobId);
+                        return;
+                    }
+
                     var currentUrl = urlsToVisit.Dequeue();
 
                     if (visitedUrls.Contains(currentUrl))
@@ -139,9 +159,29 @@ namespace defconflix.Services
                         // Update job progress every 10 pages
                         if (visitedUrls.Count % 10 == 0)
                         {
-                            job.FilesFound = filesFound;
-                            job.FilesProcessed = job.FilesFound;
-                            await context.SaveChangesAsync();
+                            // Check cancellation again before database update
+                            if (await cancellationService.IsCancellationRequestedAsync(jobId))
+                            {
+                                _logger.LogInformation($"Cancellation detected during progress update for job {jobId}");
+                                await cancellationService.MarkJobAsCancelledAsync(jobId);
+                                return;
+                            }
+
+                            // Update job progress with detailed statistics in database
+                            var currentJob = await context.CrawlerJobs.FindAsync(jobId);
+                            if (currentJob != null)
+                            {
+                                // Sync the in-memory counters with database
+                                currentJob.FilesFound = job.FilesFound;
+                                currentJob.FilesSuccessful = job.FilesSuccessful;
+                                currentJob.FilesWithErrors = job.FilesWithErrors;
+                                currentJob.FilesProcessed = job.FilesProcessed;
+                                await context.SaveChangesAsync();
+
+                                _logger.LogInformation($"Progress Update - Job {jobId}: Found={job.FilesFound}, " +
+                                    $"Successful={job.FilesSuccessful}, Errors={job.FilesWithErrors}, " +
+                                    $"Success Rate={job.SuccessRate:F1}%");
+                            }
                         }
 
                         // Add delay to be respectful to the server
@@ -164,35 +204,67 @@ namespace defconflix.Services
                 job.Status = "Completed";
                 job.EndTime = DateTime.UtcNow;
                 job.FilesFound = filesFound;
-                job.FilesProcessed = job.FilesFound;
+                job.FilesProcessed = job.FilesFound;                
+                job.FilesSuccessful = job.FilesSuccessful;
+                job.FilesWithErrors = job.FilesWithErrors;
+                job.FilesProcessed = job.FilesProcessed;
                 await context.SaveChangesAsync();
 
-                _logger.LogInformation($"Crawling completed. Found {job.FilesProcessed} files.");
-            }
+                _logger.LogInformation($"Crawling completed for job {jobId}. " +
+                    $"Total Found: {job.FilesFound}, Successful: {job.FilesSuccessful}, " +
+                    $"Errors: {job.FilesWithErrors}, Success Rate: {job.SuccessRate:F1}%");
+                }
             catch (Exception ex)
             {
                 _logger.LogError($"Crawling failed: {ex.Message}");
                 job.Status = "Failed";
                 job.ErrorMessage = ex.Message;
-                job.EndTime = DateTime.UtcNow;
+                job.EndTime = DateTime.UtcNow;                
+                job.FilesProcessed = job.FilesFound;
+                job.FilesSuccessful = job.FilesSuccessful;
+                job.FilesWithErrors = job.FilesWithErrors;
+                job.FilesProcessed = job.FilesProcessed;
                 await context.SaveChangesAsync();
             }
         }
 
         private async Task ProcessFileAsync(ApiContext context, HttpClient httpClient, string fileUrl, CrawlerJob job)
         {
+            bool wasSuccessful = false;
+
             try
             {
+                _logger.LogDebug($"Processing file URL: {fileUrl}");
+
                 var uri = new Uri(fileUrl);
-                var fileName = Uri.UnescapeDataString(Path.GetFileName(uri.LocalPath));
+                var rawFileName = Path.GetFileName(uri.LocalPath);
+                var fileName = rawFileName.SafeUrlDecode(_logger, "fileName");
                 var extension = Path.GetExtension(fileName);
 
                 if (string.IsNullOrEmpty(fileName) || string.IsNullOrEmpty(extension))
+                {
+                    await RecordProblematicUri(context, fileUrl, rawFileName, extension,
+                        "INVALID_FILENAME", "Invalid filename or extension after processing", null, job.Id);
                     return;
+                }
+
+                // Check for problematic characters BEFORE sanitization
+                var hasProblems = await CheckAndRecordProblematicCharacters(context, fileUrl, fileName, extension, job.Id);
+
+                if (hasProblems)
+                {
+                    _logger.LogWarning($"File has problematic characters but attempting to process: {fileName}");
+                }
+
+                // Sanitize the file URL
+                var sanitizedFileUrl = fileUrl.SanitizeForDatabase(_logger, "fileUrl");
+                var sanitizedFileName = fileName.SanitizeForDatabase(_logger, "fileName");
+                var sanitizedExtension = extension.ToLower().SanitizeForDatabase(_logger, "extension");
+
 
                 // Check if file already exists in database
                 var existingFile = await context.Files
-                    .FirstOrDefaultAsync(f => f.File_Path == fileUrl);
+                    .FirstOrDefaultAsync(f => f.File_Path == sanitizedFileUrl);
 
                 if (existingFile != null)
                 {
@@ -230,30 +302,82 @@ namespace defconflix.Services
 
                 // Calculate hash from URL for uniqueness
                 var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(fileUrl)));
+                    System.Text.Encoding.UTF8.GetBytes(sanitizedFileUrl)));
 
                 var file = new Files
                 {
-                    File_Path = fileUrl,
-                    File_Name = fileName,
-                    Extension = extension.ToLower(),
+                    File_Path = sanitizedFileUrl,
+                    File_Name = sanitizedFileName,
+                    Extension = sanitizedExtension,
                     Size_Bytes = fileSize > int.MaxValue ? int.MaxValue : (int)fileSize,
                     Hash = hash,
                     LastCheckAccessible = true,
-                    LastCheckedAt = DateTime.UtcNow,                    
+                    LastCheckedAt = DateTime.UtcNow,
                     Status = "Not started",
                     Created_At = DateTime.UtcNow
                 };
 
                 context.Files.Add(file);
-                await context.SaveChangesAsync();
 
-                var sizeFormatted = fileSize > 0 ? $"{fileSize / (1024.0 * 1024.0):F2} MB" : "unknown size";
-                _logger.LogInformation($"Cataloged: {fileName} ({extension}) - {sizeFormatted}");
+                try
+                {
+                    await context.SaveChangesAsync();
+
+                    // Successfully saved
+                    wasSuccessful = true;
+
+                    var sizeFormatted = fileSize > 0 ? $"{fileSize / (1024.0 * 1024.0):F2} MB" : "unknown size";
+                    _logger.LogInformation($"Cataloged: {fileName} ({extension}) - {sizeFormatted}");
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "22021")
+                {
+                    _logger.LogError($"PostgreSQL encoding error for file: {sanitizedFileName}");
+
+                    // Record the problematic URI with full details
+                    await RecordProblematicUri(context, fileUrl, fileName, extension,
+                        "POSTGRESQL_ENCODING_ERROR",
+                        $"PostgreSQL encoding error: {fileUrl.AnalyzeProblematicCharacters()}",
+                        pgEx.MessageText, job.Id);
+
+                    // Remove the problematic entity from tracking
+                    context.Entry(file).State = EntityState.Detached;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Unexpected error saving file {sanitizedFileName}: {ex}");
+
+                    await RecordProblematicUri(context, fileUrl, fileName, extension,
+                        "DATABASE_SAVE_ERROR",
+                        $"Unexpected database error: {ex.Message}",
+                        ex.Message, job.Id);
+
+                    context.Entry(file).State = EntityState.Detached;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error cataloging file {fileUrl}: {ex.Message}");
+                await RecordProblematicUri(context, fileUrl, "UNKNOWN", "UNKNOWN",
+                    "PROCESSING_ERROR",
+                    $"Error during file processing: {ex.Message}",
+                    ex.Message, job.Id);
+            }
+            finally
+            {
+                // Update counters regardless of success/failure
+                lock (job) // Thread-safe counter updates
+                {
+                    job.FilesFound++;
+                    if (wasSuccessful)
+                    {
+                        job.FilesSuccessful++;
+                    }
+                    else
+                    {
+                        job.FilesWithErrors++;
+                    }
+                    job.FilesProcessed = job.FilesSuccessful + job.FilesWithErrors;
+                }
             }
         }
 
@@ -275,16 +399,22 @@ namespace defconflix.Services
                     Uri absoluteUri;
                     if (Uri.TryCreate(baseUri, href, out absoluteUri))
                     {
-                        links.Add(absoluteUri.ToString());
+                        var sanitizedUrl = absoluteUri.ToString().SanitizeForDatabase();
+                        if (!string.IsNullOrEmpty(sanitizedUrl))
+                        {
+                            links.Add(sanitizedUrl);
+                        }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip invalid URLs
+                    _logger.LogDebug($"Skipping invalid URL: {href} - {ex.Message}");
                 }
             }
 
-            return links.Distinct().ToList();
+            return links.Distinct()
+                .Where(url => !string.IsNullOrEmpty(url))
+                .ToList();
         }
 
         private bool IsFileLink(string url)
@@ -316,6 +446,105 @@ namespace defconflix.Services
                    !IsFileLink(url) &&
                    !url.Contains("?") &&
                    !url.Contains("#");
+        }
+
+        private async Task<bool> CheckAndRecordProblematicCharacters(
+            ApiContext context,
+            string fileUrl,
+            string fileName,
+            string extension,
+            int jobId)
+        {
+            var problems = new List<string>();
+
+            // Check for null bytes
+            if (fileUrl.Contains('\0') || fileName.Contains('\0') || extension.Contains('\0'))
+            {
+                problems.Add("Contains null bytes");
+            }
+
+            // Check for control characters
+            if (fileUrl.Any(c => char.IsControl(c) && c != '\n' && c != '\r' && c != '\t') ||
+                fileName.Any(c => char.IsControl(c) && c != '\n' && c != '\r' && c != '\t') ||
+                extension.Any(c => char.IsControl(c) && c != '\n' && c != '\r' && c != '\t'))
+            {
+                problems.Add("Contains control characters");
+            }
+
+            // Check for extended ASCII
+            if (fileUrl.Any(c => (int)c > 127 && (int)c < 160) ||
+                fileName.Any(c => (int)c > 127 && (int)c < 160) ||
+                extension.Any(c => (int)c > 127 && (int)c < 160))
+            {
+                problems.Add("Contains extended ASCII control characters");
+            }
+
+            if (problems.Any())
+            {
+                var errorDetails = $"URL Analysis: {fileUrl.AnalyzeProblematicCharacters()}\n" +
+                                  $"FileName Analysis: {fileName.AnalyzeProblematicCharacters()}\n" +
+                                  $"Extension Analysis: {extension.AnalyzeProblematicCharacters()}";
+
+                await RecordProblematicUri(context, fileUrl, fileName, extension,
+                    "PROBLEMATIC_CHARACTERS",
+                    errorDetails,
+                    string.Join(", ", problems), jobId);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private async Task RecordProblematicUri(
+            ApiContext context,
+            string originalUri,
+            string fileName,
+            string extension,
+            string errorType,
+            string errorDetails,
+            string? postgresqlError,
+            int jobId)
+        {
+            try
+            {
+                // Sanitize the data being saved to avoid recursive issues
+                var sanitizedOriginalUri = originalUri.Length > 2000 ? originalUri.Substring(0, 2000) : originalUri;
+                var sanitizedFileName = fileName.Length > 500 ? fileName.Substring(0, 500) : fileName;
+                var sanitizedExtension = extension?.Length > 50 ? extension.Substring(0, 50) : extension;
+                var sanitizedErrorDetails = errorDetails?.Length > 2000 ? errorDetails.Substring(0, 2000) : errorDetails;
+                var sanitizedPostgresqlError = postgresqlError?.Length > 1000 ? postgresqlError.Substring(0, 1000) : postgresqlError;
+
+                // Remove null bytes from all fields to prevent the same error
+                sanitizedOriginalUri = sanitizedOriginalUri.Replace('\0', '?');
+                sanitizedFileName = sanitizedFileName.Replace('\0', '?');
+                sanitizedExtension = sanitizedExtension?.Replace('\0', '?');
+                sanitizedErrorDetails = sanitizedErrorDetails?.Replace('\0', '?');
+                sanitizedPostgresqlError = sanitizedPostgresqlError?.Replace('\0', '?');
+
+                var problematicUri = new ProblematicUri
+                {
+                    OriginalUri = sanitizedOriginalUri,
+                    SanitizedUri = originalUri.SanitizeForDatabase(),
+                    FileName = sanitizedFileName,
+                    Extension = sanitizedExtension,
+                    ErrorType = errorType,
+                    ErrorDetails = sanitizedErrorDetails,
+                    PostgresqlError = sanitizedPostgresqlError,
+                    CrawlerJobId = jobId,
+                    CreatedAt = DateTime.UtcNow,
+                    IsResolved = false
+                };
+
+                context.ProblematicUris.Add(problematicUri);
+                await context.SaveChangesAsync();
+
+                _logger.LogWarning($"Recorded problematic URI: {errorType} - {sanitizedFileName} (ID: {problematicUri.Id})");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to record problematic URI: {originalUri}. Error: {ex.Message}");
+            }
         }
     }
 }

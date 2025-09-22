@@ -15,6 +15,7 @@ namespace defconflix.Data
         public DbSet<Files> Files { get; set; }
         public DbSet<FileStatusCheck> FileStatusChecks { get; set; }
         public DbSet<CrawlerJob> CrawlerJobs { get; set; }
+        public DbSet<ProblematicUri> ProblematicUris { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -151,6 +152,54 @@ namespace defconflix.Data
                 entity.Property(c => c.ErrorMessage).HasMaxLength(1000);
                 entity.HasIndex(c => c.CreatedAt);
                 entity.HasIndex(c => c.Status);
+
+                entity.Property(c => c.FilesSuccessful).HasDefaultValue(0);
+                entity.Property(c => c.FilesWithErrors).HasDefaultValue(0);
+
+
+                entity.HasOne(c => c.StartedByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.StartedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(c => c.CancelledByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.CancelledByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // Indexes
+                entity.HasIndex(c => c.CreatedAt);
+                entity.HasIndex(c => c.Status);
+                entity.HasIndex(c => c.StartedByUserId);
+                entity.HasIndex(c => c.CancelledByUserId);
+                entity.HasIndex(c => c.IsCancellationRequested);
+            });
+
+            modelBuilder.Entity<ProblematicUri>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.OriginalUri).IsRequired().HasMaxLength(2000);
+                entity.Property(p => p.SanitizedUri).HasMaxLength(2000);
+                entity.Property(p => p.FileName).IsRequired().HasMaxLength(500);
+                entity.Property(p => p.Extension).HasMaxLength(50);
+                entity.Property(p => p.ErrorType).IsRequired().HasMaxLength(100);
+                entity.Property(p => p.ErrorDetails).HasMaxLength(2000);
+                entity.Property(p => p.PostgresqlError).HasMaxLength(1000);
+                entity.Property(p => p.ResolutionNotes).HasMaxLength(1000);
+                entity.Property(p => p.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                // Configure relationship with CrawlerJob
+                entity.HasOne(p => p.CrawlerJob)
+                    .WithMany()
+                    .HasForeignKey(p => p.CrawlerJobId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Add indexes for querying
+                entity.HasIndex(p => p.ErrorType);
+                entity.HasIndex(p => p.CreatedAt);
+                entity.HasIndex(p => p.IsResolved);
+                entity.HasIndex(p => p.CrawlerJobId);
+                entity.HasIndex(p => p.Extension);
             });
         }
     }

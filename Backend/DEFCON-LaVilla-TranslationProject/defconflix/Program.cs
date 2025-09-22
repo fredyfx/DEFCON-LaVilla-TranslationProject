@@ -34,6 +34,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IFileTextService, FileTextService>();
 builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
+builder.Services.AddScoped<ICrawlerCancellationService, CrawlerCancellationService>();
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
 builder.Services.AddRazorPages();
 // Add Background Services
