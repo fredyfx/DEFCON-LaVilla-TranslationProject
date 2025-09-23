@@ -34,6 +34,12 @@ namespace defconflix.Models
         [Column("last_checked_at")]
         public DateTime? LastCheckedAt { get; set; }
 
+        [Column("conference")]
+        public string? Conference { get; set; }
+
+        [Column("language")]
+        public string? Language { get; set; }
+
         // Navigation property
         public virtual ICollection<FileStatusCheck> StatusChecks { get; set; } = new List<FileStatusCheck>();
 
