@@ -58,7 +58,7 @@ namespace defconflix.Services
 
             try
             {
-                var url = file.HttpUrl;
+                var url = file.File_Path;
                 _logger.LogInformation("Checking file availability: {Url}", url);
 
                 // Use HEAD request to check if file exists without downloading it

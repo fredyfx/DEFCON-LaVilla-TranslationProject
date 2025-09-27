@@ -1,7 +1,6 @@
 ﻿using defconflix.Data;
 using defconflix.Interfaces;
 using defconflix.Models;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text;
@@ -11,7 +10,8 @@ namespace defconflix.Endpoints
     public class FilesEndpoint : IEndpoint
     {
         public record BulkDownloadRequest(long[] Ids);
-        public record FileDTO(long Id, string FileName, string Status);
+        public record FileDTO(long Id, string FileName, string conference, string Status);
+        public record ConferenceDto(string name);
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
 
@@ -30,32 +30,20 @@ namespace defconflix.Endpoints
                 page = Math.Max(1, page);
                 pageSize = Math.Clamp(pageSize, 1, 100); // Max 100 items per page
 
-                Expression<Func<Files, bool>> filterFiles = f => true;
-                Expression<Func<Files, bool>> filterVideos = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterPdfs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterSRTs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterTxts = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-
-                // Apply the appropriate filter based on the requested file type using switch expression
-                var filter = type.ToLower() switch
-                {
-                    "mp4" => filterVideos,
-                    "pdf" => filterPdfs,
-                    "srt" => filterSRTs,
-                    "txt" => filterTxts,
-                    _ => filterFiles // Default case, should not be hit due to earlier validation
-                };
+                Expression<Func<Files, bool>> filter = f =>
+                f.LastCheckAccessible == true &&
+                f.Extension.ToLower() == $".{fileTypeRequested}" &&
+                !string.IsNullOrEmpty(f.Conference);
 
                 var totalFiles = await db.Files.CountAsync(filter);
                 var totalPages = (int)Math.Ceiling((double)totalFiles / pageSize);
-
 
                 var files = await db.Files
                     .Where(filter)
                     .OrderBy(u => u.Id)
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
                     .ToListAsync();
 
                 return Results.Json(new
@@ -77,7 +65,7 @@ namespace defconflix.Endpoints
             {
                 var file = await db.Files
                     .Where(f => f.Id == id)
-                    .Select(u => GetFTPLocation(u.File_Path))
+                    .Select(u => u.File_Path)
                     .SingleOrDefaultAsync();
 
                 return Results.Json(new
@@ -95,7 +83,7 @@ namespace defconflix.Endpoints
 
                 var file = await db.Files
                     .Where(f => f.File_Name == filename)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
                     .SingleOrDefaultAsync();
 
                 if (file == null)
@@ -109,27 +97,12 @@ namespace defconflix.Endpoints
                 });
             }
 
-            async Task<IResult> GetSearchFilesByTypeAndTerm(ApiContext db, string type, string term, int page = 1, int pageSize = 10)
-            {
-                // Validate pagination parameters
-                page = Math.Max(1, page);
-                pageSize = Math.Clamp(pageSize, 1, 50);
-
-                Expression<Func<Files, bool>> filterFiles = f => true;
-                Expression<Func<Files, bool>> filterVideos = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".mp4" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterPdfs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".pdf" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterSRTs = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".srt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-                Expression<Func<Files, bool>> filterTxts = f => f.LastCheckAccessible == true && f.Extension.ToLower() == ".txt" && (f.File_Path.Contains("presentation") || f.File_Path.Contains("video"));
-
-                // Apply the appropriate filter based on the requested file type using switch expression
-                var filter = type.ToLower() switch
+            async Task<IResult> GetSearchFilesByTypeConferenceAndTerm(ApiContext db, string fileTypeRequested, string conference, string term, int page = 1, int pageSize = 10)
+            {                
+                if (fileTypeRequested != "all" && fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt" && fileTypeRequested != "txt")
                 {
-                    "mp4" => filterVideos,
-                    "pdf" => filterPdfs,
-                    "srt" => filterSRTs,
-                    "txt" => filterTxts,
-                    _ => filterFiles // Default case, should not be hit due to earlier validation
-                };
+                    return Results.BadRequest("Invalid file type requested. Only 'mp4', 'pdf', 'srt' and 'txt' are supported.");
+                }
 
                 // Create case-insensitive search for partial matches
                 var searchTerm = term.Trim();
@@ -139,10 +112,41 @@ namespace defconflix.Endpoints
                     return Results.BadRequest("Search term cannot be empty");
                 }
 
+                // Validate pagination parameters
+                page = Math.Max(1, page);
+                pageSize = Math.Clamp(pageSize, 1, 50);
+
+                Expression<Func<Files, bool>> filter = f =>
+                f.LastCheckAccessible == true &&
+                !string.IsNullOrEmpty(f.Conference);
+
                 var query = db.Files
-                    .Where(filter)
-                    .Where(f => EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"))
-                    .OrderBy(f => f.File_Name.Length) // Shorter names first (more relevant)
+                    .Where(filter);
+
+                if (fileTypeRequested.ToLower() == "all")
+                {
+                    query = query.Where(f => 
+                    f.Extension.ToLower() == ".mp4" || 
+                    f.Extension.ToLower() == ".pdf" || 
+                    f.Extension.ToLower() == ".srt" || 
+                    f.Extension.ToLower() == ".txt");
+                }
+                else { 
+                    query = query.Where(f => f.Extension.ToLower() == $".{fileTypeRequested}");
+                }
+
+                if (!string.IsNullOrEmpty(term) && term.ToLower() != "all")
+                {
+                    query = query.Where(f => EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"));
+                }
+                
+                if (!string.IsNullOrEmpty(conference) && conference.ToLower() != "all")
+                {
+                    query = query.Where(f => !string.IsNullOrEmpty(f.Conference) &&
+                    EF.Functions.ILike(f.Conference, conference));
+                }
+                
+                query = query.OrderBy(f => f.Conference)
                     .ThenBy(f => f.File_Name);
 
                 var totalCount = await query.CountAsync();
@@ -151,11 +155,13 @@ namespace defconflix.Endpoints
                 var files = await query
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Status))
+                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
                     .ToListAsync();
 
                 return Results.Json(new
                 {
+                    Conference = conference,
+                    FileType = fileTypeRequested,
                     SearchTerm = searchTerm,
                     Files = files,
                     Pagination = new
@@ -206,7 +212,7 @@ namespace defconflix.Endpoints
                         var file = files.FirstOrDefault(f => f.Id == currentId);
                         if (file != null)
                         {
-                            var url = GetFTPLocation(file.File_Path);
+                            var url = file.File_Path;
                             var content = $"{currentId} {url}";
                             contentBuilder.AppendLine(content);
                         }
@@ -219,7 +225,7 @@ namespace defconflix.Endpoints
                     return Results.File(
                         fileBytes,
                         contentType: "text/plain",
-                        fileDownloadName: $"defcon_urls_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
+                        fileDownloadName: $"infocon_urls_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
                     );
                 }
                 catch (Exception ex)
@@ -273,7 +279,7 @@ namespace defconflix.Endpoints
                         var file = files.SingleOrDefault(f => f.Id == currentId);
                         if (file != null)
                         {
-                            var url = GetFTPLocation(file.File_Path);
+                            var url = file.File_Path;
                             var content = $"{currentId} {url}";
                             contentBuilder.AppendLine(content);
                         }
@@ -286,7 +292,7 @@ namespace defconflix.Endpoints
                     return Results.File(
                         fileBytes,
                         contentType: "text/plain",
-                        fileDownloadName: $"defcon_urls_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
+                        fileDownloadName: $"infocon_urls_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt"
                     );
                 }
                 catch (Exception ex)
@@ -308,58 +314,16 @@ namespace defconflix.Endpoints
             app.MapGet("/api/file/search/{filename}", GetSearchExactFileName)
                 .RequireAuthorization("ApiAccess");
 
-            // api/files/mp4/search/Launching Shells?page=1&pagesize=20
-            app.MapGet("/api/files/{type}/search/{term}", GetSearchFilesByTypeAndTerm)
-                .RequireAuthorization("ApiAccess");
+            // api/files/mp4/conference/all/search/Launching Shells?page=1&pagesize=20
+            app.MapGet("/api/files/{fileTypeRequested}/conference/{conference}/search/{term}", GetSearchFilesByTypeConferenceAndTerm);
+            //.RequireAuthorization("ApiAccess");
 
             // api/files/download?ids=1,2,3,4...
-            app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload)
-                .RequireAuthorization("ApiAccess");
+            app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload);
+            //.RequireAuthorization("ApiAccess");
 
-            app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload)
-                .RequireAuthorization("ApiAccess");
-        }
-
-        static string GetFTPLocation(string filePath)
-        {
-            // From:
-            // \\SERVER\usbshare1-1\cons\DEF CON\DEF CON 27\voting-village-report-defcon27.pdf
-            // Target:
-            // cons\\DEF CON\\DEF CON 27\\DEF CON 27 presentations\\DEFCON-27-albinowax-HTTP-Desync-Attacks-demo.mp4
-            // https://media.defcon.org/DEF%20CON%2027//DEF%20CON%2027%20presentations//DEFCON-27-albinowax-HTTP-Desync-Attacks-demo.mp4
-
-            var removePrefixUntil = filePath.IndexOf("cons");
-            filePath = filePath.Remove(0, removePrefixUntil);
-
-            // Remove the "cons\\" prefix if it exists
-            string cleanPath = filePath;
-            if (cleanPath.StartsWith("cons\\", StringComparison.OrdinalIgnoreCase))
-            {
-                cleanPath = cleanPath.Substring(5); // Remove "cons\\"
-            }
-
-            if (cleanPath.StartsWith("DEF CON", StringComparison.OrdinalIgnoreCase))
-            {
-                cleanPath = cleanPath.Substring(7); // Remove "DEF CON"
-            }
-
-            // Replace backslashes with forward slashes
-            cleanPath = cleanPath.Replace('\\', '/');
-
-            // URL encode the path components while preserving forward slashes
-            string[] pathParts = cleanPath.Split('/');
-            for (int i = 0; i < pathParts.Length; i++)
-            {
-                pathParts[i] = Uri.EscapeDataString(pathParts[i]);
-            }
-
-            // Reconstruct the path with forward slashes
-            string urlEncodedPath = string.Join("/", pathParts);
-
-            // Construct the full FTP URL
-            string ftpUrl = "https://media.defcon.org." + urlEncodedPath;
-
-            return ftpUrl;
+            app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload);
+                //.RequireAuthorization("ApiAccess");
         }
     }
 }

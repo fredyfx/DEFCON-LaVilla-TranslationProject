@@ -29,6 +29,7 @@
             <div class="info-item">
                 <label>Username:</label>
                 <span>@Model.CurrentUser.Username</span>
+                <input type="hidden" id="jwt-token" value="@Model.JwtToken" />
             </div>
             <div class="info-item">
                 <label>Email:</label>
@@ -79,16 +80,14 @@
                 </button>
             </div>
 
-            <form method="post" asp-page-handler="ResetApiKey" onsubmit="return confirm('Are you sure? This will invalidate your current API key!');">
-                <button type="submit" class="btn-warning">
-                    🔄 Reset API Key
-                </button>
-            </form>
+            <button type="button" class="btn-warning" onclick="resetApiKey()">
+                🔄 Reset API Key
+            </button>
         </div>
 
         <div class="usage-example">
             <h4>Usage Example:</h4>
-            <pre><code>curl -H "X-API-Key: @Model.CurrentUser.ApiKey" \
+            <pre><code>curl -H "X-API-Key: @Guid.NewGuid()" \
      https://infoconflix.com/api/protected/user-info</code></pre>
         </div>
     </section>
@@ -113,18 +112,17 @@
                     📋
                 </button>
             </div>
-
-            <form method="post" asp-page-handler="GenerateNewToken">
-                <button type="submit" class="btn-primary">
-                    🔄 Generate New Token
-                </button>
-            </form>
+            
+            <button type="button" class="btn-primary" onclick="generateNewToken()">
+                🔄 Generate New Token
+            </button>
+            
         </div>
 
         <div class="usage-example">
             <h4>Usage Example:</h4>
             <pre><code>curl -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \
-     https://your-api.com/api/protected/user-stats</code></pre>
+     https://infoconflix.com/api/protected/user-stats</code></pre>
         </div>
     </section>
 
@@ -401,4 +399,70 @@
             alert('Failed to copy to clipboard');
         });
     }
+
+    async function resetApiKey() {
+        if (!confirm('Are you sure? This will invalidate your current API key!')) {
+            return;
+        }
+    
+        const jwtToken = document.getElementById('jwt-token').value;
+
+        try {
+            const response = await fetch('/api/reset-key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${jwtToken}`
+                }
+            });
+        
+            if (response.ok) {
+                const result = await response.json();
+                alert('API Key reset successfully!');
+                document.getElementById('apiKey').textContent = result.apiKey;
+            } else {
+                alert('Failed to reset API key. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred while resetting the API key.');
+        }
+    }
+
+    async function generateNewToken() {
+    try {
+        
+        const apiKey = document.getElementById('apiKey')?.textContent;
+        
+        if (!apiKey) {
+            alert('API Key not found. Please refresh the page.');
+            return;
+        }
+        
+        const response = await fetch('/api/auth/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': apiKey
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Update the token display on the page
+            const tokenElement = document.getElementById('jwtToken');
+            if (tokenElement) {
+                tokenElement.textContent = result.token;
+            }            
+            
+            alert('New JWT token generated successfully!');
+        } else {
+            alert('Failed to generate new token. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while generating the token.');
+    }
+}
 </script>
