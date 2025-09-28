@@ -160,14 +160,6 @@ namespace defconflix.WebAPI.Services
                 ValidateFileType(fileTypeRequested);
                 ValidatePaginationParameters(ref page, ref pageSize);
 
-                var searchTerm = term.Trim();
-
-                if (string.IsNullOrWhiteSpace(searchTerm))
-                {
-                    _logger.LogWarning("Search term cannot be empty or whitespace");
-                    throw new ArgumentException("Search term cannot be empty or whitespace.");
-                }
-
                 var filter = GetSearchFilter(fileTypeRequested.ToLower(), conference, term);
 
                 var totalFiles = await _dbContext.Files.CountAsync(filter);
@@ -233,27 +225,27 @@ namespace defconflix.WebAPI.Services
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
                     (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
-                    EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"),
+                    (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 "mp4" => f => f.Extension.ToLower() == ".mp4" &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
                     (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
-                    EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"),
+                    (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 "pdf" => f => f.Extension.ToLower() == ".pdf" &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
                     (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
-                    EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"),
+                    (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 "srt" => f => f.Extension.ToLower() == ".srt" &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
                     (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
-                    EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"),
+                    (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 "txt" => f => f.Extension.ToLower() == ".txt" &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
                     (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
-                    EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"),
+                    (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 _ => f => true
             };
         }

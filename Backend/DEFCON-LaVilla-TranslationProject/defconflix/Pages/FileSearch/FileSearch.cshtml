@@ -175,7 +175,7 @@
                     </div>
                 </div>
             }
-            else if (!string.IsNullOrEmpty(Model.SearchTerm) || !string.IsNullOrEmpty(Model.FileType))
+            else if (!string.IsNullOrEmpty(Model.FileType))
             {
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i> No files found matching your search criteria.
@@ -211,14 +211,16 @@
         var queryParams = new List<string>();
 
         if (!string.IsNullOrEmpty(Model.FileType))
+        {
             queryParams.Add($"fileType={Uri.EscapeDataString(Model.FileType)}");
+        }
 
         if (!string.IsNullOrEmpty(Model.Conference))
+        {            
             queryParams.Add($"conference={Uri.EscapeDataString(Model.Conference)}");
-
-        if (!string.IsNullOrEmpty(Model.SearchTerm))
-            queryParams.Add($"searchTerm={Uri.EscapeDataString(Model.SearchTerm)}");
-
+        }
+        
+        queryParams.Add($"searchTerm={Model.SearchTerm}");
         queryParams.Add($"page={page}");
         queryParams.Add($"pageSize={Model.PageSize}");
 

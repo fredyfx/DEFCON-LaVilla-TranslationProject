@@ -71,7 +71,7 @@ namespace defconflix.Pages.FileSearch
 
             await GetConferences();
 
-            if (string.IsNullOrEmpty(FileType) && string.IsNullOrEmpty(SearchTerm))
+            if (string.IsNullOrEmpty(FileType))
             {
                 return Page();
             }
