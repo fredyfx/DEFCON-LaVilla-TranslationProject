@@ -7,7 +7,7 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h2>DEFCON File Search</h2>
+            <h2>INFOCON File Search</h2>
 
             <!-- Search Form -->
             <div class="card mb-4">
@@ -17,7 +17,7 @@
                 <div class="card-body">
                     <form method="get" id="searchForm">
                         <div class="row">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="fileType" class="form-label">File Type</label>
                                 <select class="form-select" id="fileType" name="fileType" asp-for="FileType">
                                     <option value="">Select file type</option>
@@ -35,14 +35,25 @@
                                     <option value="all">All Conferences</option>
                                     @foreach (var conf in Model.AvailableConferences)
                                     {
-                                        <option value="@conf.Id">@conf.DisplayName</option>
+                                        <option value="@conf.DisplayName">@conf.DisplayName</option>
                                     }
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="searchTerm" class="form-label">Search Term</label>
                                 <input type="text" class="form-control" id="searchTerm" name="searchTerm"
                                        asp-for="SearchTerm" placeholder="Enter search term...">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="pageSize" class="form-label">Page Size</label>
+                                <select class="form-select" id="pageSize" name="pageSize" asp-for="PageSize">
+                                    <option value="10" selected="@(Model.PageSize == 10)">10 per page</option>
+                                    <option value="20" selected="@(Model.PageSize == 20)">20 per page</option>
+                                    <option value="30" selected="@(Model.PageSize == 30)">30 per page</option>
+                                    <option value="50" selected="@(Model.PageSize == 50)">50 per page</option>
+                                    <option value="75" selected="@(Model.PageSize == 75)">75 per page</option>
+                                    <option value="100" selected="@(Model.PageSize == 100)">100 per page</option>
+                                </select>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -83,7 +94,8 @@
                                         <th width="50">
                                             <input type="checkbox" id="masterCheckbox" class="form-check-input">
                                         </th>
-                                        <th>ID</th>
+                                        @* <th>ID</th> *@
+                                        <th>Conference</th>
                                         <th>File Name</th>
                                         <th>Status</th>
                                         <th width="100">Actions</th>
@@ -97,7 +109,8 @@
                                                 <input type="checkbox" class="form-check-input file-checkbox"
                                                        value="@file.Id" data-filename="@file.FileName">
                                             </td>
-                                            <td>@file.Id</td>
+                                            @* <td>@file.Id</td> *@
+                                            <td>@file.Conference</td>
                                             <td>
                                                 <span class="fw-medium">@file.FileName</span>
                                             </td>
@@ -116,7 +129,7 @@
                                             <td>
                                                 <button type="button" class="btn btn-sm btn-outline-primary"
                                                         onclick="downloadSingle(@file.Id)">
-                                                    <i class="fas fa-download"></i>
+                                                    <i class="fas fa-download">Download</i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -136,13 +149,13 @@
                                             <a class="page-link" href="@GetPageUrl(1)">First</a>
                                         </li>
                                         <li class="page-item">
-                                            <a class="page-link" href="@GetPageUrl(Model.CurrentPage - 1)">Previous</a>
+                                            <a class="page-link" href="@GetPageUrl(Model.Page - 1)">Previous</a>
                                         </li>
                                     }
 
-                                    @for (int i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
+                                    @for (int i = Math.Max(1, Model.Page - 2); i <= Math.Min(Model.TotalPages, Model.Page + 2); i++)
                                     {
-                                        <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                        <li class="page-item @(i == Model.Page ? "active" : "")">
                                             <a class="page-link" href="@GetPageUrl(i)">@i</a>
                                         </li>
                                     }
@@ -150,7 +163,7 @@
                                     @if (Model.HasNextPage)
                                     {
                                         <li class="page-item">
-                                            <a class="page-link" href="@GetPageUrl(Model.CurrentPage + 1)">Next</a>
+                                            <a class="page-link" href="@GetPageUrl(Model.Page + 1)">Next</a>
                                         </li>
                                         <li class="page-item">
                                             <a class="page-link" href="@GetPageUrl(Model.TotalPages)">Last</a>
@@ -289,21 +302,22 @@
 
             // Determine which endpoint to use based on count
             if (ids.length <= 20) {
-                // Use GET endpoint
+                
                 const idsParam = ids.join(',');
                 const url = `/api/files/download?ids=${idsParam}`;
+                                
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = url;
 
-                // Create a temporary link to trigger download
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = '';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                document.body.appendChild(iframe);
+                                
+                setTimeout(() => {
+                    loadingModal.hide();
+                    document.body.removeChild(iframe);
+                }, 1000);
 
-                loadingModal.hide();
-            } else {
-                // Use POST endpoint
+            } else {                
                 fetch('/api/files/download', {
                     method: 'POST',
                     headers: {
@@ -321,17 +335,25 @@
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = `defcon_urls_${new Date().toISOString().slice(0,10)}.txt`;
+                    link.download = `infoconflix_urls_${new Date().toISOString().slice(0,10)}.txt`;
                     document.body.appendChild(link);
                     link.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(link);
-                    loadingModal.hide();
+                    
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(link);
+                        loadingModal.hide();
+                    }, 500);
                 })
                 .catch(error => {
                     console.error('Download error:', error);
                     alert('An error occurred while downloading files. Please try again.');
                     loadingModal.hide();
+                })
+                .finally(() => {
+                    setTimeout(() => {
+                        loadingModal.hide();
+                    }, 2000);
                 });
             }
         }

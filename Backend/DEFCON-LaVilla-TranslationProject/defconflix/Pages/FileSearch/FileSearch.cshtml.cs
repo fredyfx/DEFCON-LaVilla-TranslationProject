@@ -1,23 +1,23 @@
 using defconflix.Data;
+using defconflix.WebAPI.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace defconflix.Pages.FileSearch
 {
     public class FileSearchModel : BasePageModel
     {
-        private readonly HttpClient _httpClient;
         private readonly ApiContext _dbContext;
+        private readonly IFilesService _filesService;
         private readonly ILogger<FileSearchModel> _logger;
 
         public FileSearchModel(
-            HttpClient httpClient,
             ApiContext dbContext,
+            IFilesService filesService,
             ILogger<FileSearchModel> logger)
         {
-            _httpClient = httpClient;
             _dbContext = dbContext;
+            _filesService = filesService;
             _logger = logger;
         }
 
@@ -37,21 +37,13 @@ namespace defconflix.Pages.FileSearch
         public int PageSize { get; set; } = 10;
 
         // Results properties
-        public List<FileDto> Files { get; set; } = new();
-        public int CurrentPage { get; set; }
+        public List<FileDTO> Files { get; set; } = new();
         public int TotalPages { get; set; }
         public int TotalFiles { get; set; }
         public bool HasPreviousPage { get; set; }
         public bool HasNextPage { get; set; }
 
         public List<ConferenceInfo> AvailableConferences { get; set; } = new();
-
-        public class FileDto
-        {
-            public int Id { get; set; }
-            public string FileName { get; set; } = string.Empty;
-            public string Status { get; set; } = string.Empty;
-        }
 
         public class PaginationInfo
         {
@@ -69,22 +61,15 @@ namespace defconflix.Pages.FileSearch
             public string DisplayName { get; set; } = string.Empty;
         }
 
-        public class ApiFilesResponse
+        public async Task<IActionResult> OnGetAsync([FromQuery] string? fileType, [FromQuery] string? conference, [FromQuery] string? searchTerm, [FromQuery] int? page, [FromQuery] int? pageSize)
         {
-            public List<FileDto> Files { get; set; } = new();
-            public PaginationInfo Pagination { get; set; } = new();
-        }
+            FileType = fileType;
+            Conference = conference;
+            SearchTerm = searchTerm;
+            Page = page ?? 1;
+            PageSize = pageSize ?? 10;
 
-        public async Task<IActionResult> OnGetAsync()
-        {
-            AvailableConferences = await _dbContext.Conferences
-                .OrderBy(c => c.Name)
-                .Select(c => new ConferenceInfo
-                {
-                    Id = c.Id,
-                    DisplayName = c.Name
-                })
-                .ToListAsync();
+            await GetConferences();
 
             if (string.IsNullOrEmpty(FileType) && string.IsNullOrEmpty(SearchTerm))
             {
@@ -103,65 +88,37 @@ namespace defconflix.Pages.FileSearch
 
             return Page();
         }
-        
+
+        private async Task GetConferences()
+        {
+            AvailableConferences = await _dbContext.Conferences
+                .OrderBy(c => c.Name)
+                .Select(c => new ConferenceInfo
+                {
+                    Id = c.Id,
+                    DisplayName = c.Name
+                })
+                .ToListAsync();
+        }
+
         private async Task SearchFilesAsync()
         {
-            if (string.IsNullOrEmpty(FileType))
+            var result = await _filesService.SearchFilesByTypeConferenceAndTerm(FileType, Conference, SearchTerm, Page, PageSize);
+            Files = result.Files.ToList();
+            Page = result.Pagination.CurrentPage;
+            TotalPages = result.Pagination.TotalPages;
+            TotalFiles = result.Pagination.TotalFiles;
+            HasPreviousPage = result.Pagination.HasPreviousPage;
+            HasNextPage = result.Pagination.HasNextPage;
+            PaginationInfo pagination = new()
             {
-                ModelState.AddModelError(nameof(FileType), "File type is required.");
-                return;
-            }
-
-            // Build the API URL
-            var baseUrl = $"/api/files/{FileType}";
-
-            // Add conference and search term if provided
-            if (!string.IsNullOrEmpty(Conference) && !string.IsNullOrEmpty(SearchTerm))
-            {
-                baseUrl = $"/api/files/{FileType}/conference/{Conference}/search/{Uri.EscapeDataString(SearchTerm)}";
-            }
-
-            // Add pagination parameters
-            var queryParams = new List<string>
-            {
-                $"page={Page}",
-                $"pagesize={PageSize}"
+                CurrentPage = Page,
+                PageSize = PageSize,
+                TotalPages = TotalPages,
+                TotalFiles = TotalFiles,
+                HasPreviousPage = HasPreviousPage,
+                HasNextPage = HasNextPage
             };
-
-            var fullUrl = $"{baseUrl}?{string.Join("&", queryParams)}";
-
-            _logger.LogInformation("Searching files with URL: {Url}", fullUrl);
-
-            var response = await _httpClient.GetAsync(fullUrl);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var apiResponse = JsonSerializer.Deserialize<ApiFilesResponse>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (apiResponse != null)
-                {
-                    Files = apiResponse.Files;
-                    CurrentPage = apiResponse.Pagination.CurrentPage;
-                    TotalPages = apiResponse.Pagination.TotalPages;
-                    TotalFiles = apiResponse.Pagination.TotalFiles;
-                    HasPreviousPage = apiResponse.Pagination.HasPreviousPage;
-                    HasNextPage = apiResponse.Pagination.HasNextPage;
-                }
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("API call failed with status {StatusCode}: {Content}", response.StatusCode, errorContent);
-
-                ModelState.AddModelError(string.Empty,
-                    response.StatusCode == System.Net.HttpStatusCode.BadRequest
-                        ? "Invalid search parameters."
-                        : "Unable to search files at this time. Please try again later.");
-            }
         }
     }
 }

@@ -4,7 +4,8 @@
 <head>
     <meta name="viewport" content="width=device-width" />
     <title>@ViewData["Title"] - DEFCON Translation Project</title>
-    <link rel="stylesheet" href="https://unpkg.com/hack@0.2.1/hack.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="main container">
@@ -13,7 +14,7 @@
         <header>
             <h1>DEFCON - La Villa Hacker - Translation Project</h1>
             <nav class="main-nav">
-                <a href="/" class="@(ViewContext.RouteData.Values["Page"]?.ToString() == "/Index" ? "active" : "")">
+                @* <a href="/" class="@(ViewContext.RouteData.Values["Page"]?.ToString() == "/Index" ? "active" : "")">
                     Dashboard
                 </a>
                 <a href="/Files" class="@(ViewContext.RouteData.Values["Page"]?.ToString()?.StartsWith("/Files") == true ? "active" : "")">
@@ -21,7 +22,7 @@
                 </a>
                 <a href="/Translation" class="@(ViewContext.RouteData.Values["Page"]?.ToString()?.StartsWith("/Translation") == true ? "active" : "")">
                     Translation
-                </a>
+                </a> *@
 
                 <div class="nav-right">
                     <partial name="_LoginPartial" />
@@ -37,7 +38,8 @@
             <p>
                 🏴‍☠️ La Villa Hacker @@ DEFCON |
                 <a href="/api/tools/downloader">Download Script</a> |
-                <a href="https://github.com/fredyfx/DEFCON-LaVilla-TranslationProject" target="_blank">GitHub</a>
+                <a href="https://github.com/fredyfx/DEFCON-LaVilla-TranslationProject" target="_blank">GitHub</a> |
+                Made with &#10084; by <a href="https://github.com/fredyfx" target="_blank"> @@fredyfx </a>
             </p>
         </footer>
     </div>
