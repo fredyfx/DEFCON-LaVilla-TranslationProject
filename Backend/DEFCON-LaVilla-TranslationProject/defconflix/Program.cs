@@ -22,6 +22,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 // Add PostgreSQL database
 builder.Services.AddPersistenceFX(Configuration);
 
+// Add Memory Cache
+builder.Services.AddMemoryCache();
+
 // Add Authentication
 builder.Services.AddAuthFX(Configuration);
 

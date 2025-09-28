@@ -2,6 +2,7 @@
 using defconflix.Models;
 using defconflix.WebAPI.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Linq.Expressions;
 using System.Text;
 
@@ -10,16 +11,20 @@ namespace defconflix.WebAPI.Services
     public class FilesService : IFilesService
     {
         private readonly ApiContext _dbContext;
+        private readonly IMemoryCache _cache;
         private readonly ILogger<FilesService> _logger;
 
         private readonly HashSet<string> _validFileTypes = new() { "all", "mp4", "pdf", "srt", "txt" };
         private const int MaxBulkDownloadIds = 100;
         private const int MaxQueryDownloadIds = 20;
         private const int MaxPageSize = 100;
+        
+        private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
 
-        public FilesService(ApiContext dbContext, ILogger<FilesService> logger)
+        public FilesService(ApiContext dbContext, IMemoryCache cache, ILogger<FilesService> logger)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -159,7 +164,17 @@ namespace defconflix.WebAPI.Services
             {
                 ValidateFileType(fileTypeRequested);
                 ValidatePaginationParameters(ref page, ref pageSize);
+                                
+                var cacheKey = $"search_{fileTypeRequested}_conference_{conference}_term_{term}_page_{page}_size_{pageSize}";
+                                
+                if (_cache.TryGetValue(cacheKey, out var cachedResult))
+                {
+                    _logger.LogDebug("Cache hit for key: {CacheKey}", cacheKey);
+                    return ((IEnumerable<FileDTO> Files, PaginationInfo Pagination))cachedResult!;
+                }
 
+                _logger.LogDebug("Cache miss for key: {CacheKey}", cacheKey);
+                
                 var filter = GetSearchFilter(fileTypeRequested.ToLower(), conference, term);
 
                 var totalFiles = await _dbContext.Files.CountAsync(filter);
@@ -169,7 +184,12 @@ namespace defconflix.WebAPI.Services
 
                 var pagination = CreatePaginationInfo(page, pageSize, totalPages, totalFiles);
 
-                return (files, pagination);
+                var result = (files, pagination);
+                                
+                _cache.Set(cacheKey, result, _cacheExpiration);
+                _logger.LogDebug("Cached result for key: {CacheKey}", cacheKey);
+
+                return result;
             }
             catch (Exception ex)
             {

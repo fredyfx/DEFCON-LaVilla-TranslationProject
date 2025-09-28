@@ -1,24 +1,30 @@
 using defconflix.Data;
 using defconflix.WebAPI.Interfaces;
+using defconflix.WebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace defconflix.Pages.FileSearch
 {
     public class FileSearchModel : BasePageModel
     {
         private readonly ApiContext _dbContext;
+        private readonly IMemoryCache _cache;
         private readonly IFilesService _filesService;
         private readonly ILogger<FileSearchModel> _logger;
 
+        private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
         public FileSearchModel(
             ApiContext dbContext,
+            IMemoryCache cache,
             IFilesService filesService,
             ILogger<FileSearchModel> logger)
         {
-            _dbContext = dbContext;
-            _filesService = filesService;
-            _logger = logger;
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _filesService = filesService ?? throw new ArgumentNullException(nameof(filesService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         [BindProperty(SupportsGet = true)]
@@ -43,7 +49,7 @@ namespace defconflix.Pages.FileSearch
         public bool HasPreviousPage { get; set; }
         public bool HasNextPage { get; set; }
 
-        public List<ConferenceInfo> AvailableConferences { get; set; } = new();
+        public List<Conference> AvailableConferences { get; set; } = new();
 
         public class PaginationInfo
         {
@@ -53,12 +59,6 @@ namespace defconflix.Pages.FileSearch
             public int TotalFiles { get; set; }
             public bool HasPreviousPage { get; set; }
             public bool HasNextPage { get; set; }
-        }
-
-        public class ConferenceInfo
-        {
-            public long Id { get; set; }
-            public string DisplayName { get; set; } = string.Empty;
         }
 
         public async Task<IActionResult> OnGetAsync([FromQuery] string? fileType, [FromQuery] string? conference, [FromQuery] string? searchTerm, [FromQuery] int? page, [FromQuery] int? pageSize)
@@ -91,14 +91,23 @@ namespace defconflix.Pages.FileSearch
 
         private async Task GetConferences()
         {
-            AvailableConferences = await _dbContext.Conferences
+            var cacheKey = $"conference_list";
+
+            if (_cache.TryGetValue(cacheKey, out var cachedResult))
+            {
+                _logger.LogDebug("Cache hit for key: {CacheKey}", cacheKey);
+                AvailableConferences = (List<Conference>)cachedResult!;
+                return;
+            }
+
+            var result = await _dbContext.Conferences
                 .OrderBy(c => c.Name)
-                .Select(c => new ConferenceInfo
-                {
-                    Id = c.Id,
-                    DisplayName = c.Name
-                })
                 .ToListAsync();
+
+            _cache.Set(cacheKey, result, _cacheExpiration);
+            _logger.LogDebug("Cached result for key: {CacheKey}", cacheKey);
+
+            AvailableConferences = result;
         }
 
         private async Task SearchFilesAsync()

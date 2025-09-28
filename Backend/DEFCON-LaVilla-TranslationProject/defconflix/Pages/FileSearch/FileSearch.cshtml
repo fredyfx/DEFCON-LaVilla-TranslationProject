@@ -35,7 +35,7 @@
                                     <option value="all">All Conferences</option>
                                     @foreach (var conf in Model.AvailableConferences)
                                     {
-                                        <option value="@conf.DisplayName">@conf.DisplayName</option>
+                                        <option value="@conf.Name">@conf.Name</option>
                                     }
                                 </select>
                             </div>
@@ -70,6 +70,7 @@
             <!-- Results Section -->
             @if (Model.Files?.Any() == true)
             {
+                <div id="file-list-anchor"></div>
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5>Search Results (@Model.TotalFiles files found)</h5>
@@ -224,7 +225,7 @@
         queryParams.Add($"page={page}");
         queryParams.Add($"pageSize={Model.PageSize}");
 
-        return $"/files/search?{string.Join("&", queryParams)}";
+        return $"/files/search?{string.Join("&", queryParams)}#file-list-anchor";
     }
 }
 
