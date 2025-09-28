@@ -1,6 +1,7 @@
 ﻿using defconflix.Data;
 using defconflix.Interfaces;
 using defconflix.Models;
+using defconflix.WebAPI.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using System.Text;
@@ -97,81 +98,29 @@ namespace defconflix.Endpoints
                 });
             }
 
-            async Task<IResult> GetSearchFilesByTypeConferenceAndTerm(ApiContext db, string fileTypeRequested, string conference, string term, int page = 1, int pageSize = 10)
-            {                
-                if (fileTypeRequested != "all" && fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt" && fileTypeRequested != "txt")
-                {
-                    return Results.BadRequest("Invalid file type requested. Only 'mp4', 'pdf', 'srt' and 'txt' are supported.");
-                }
-
-                // Create case-insensitive search for partial matches
-                var searchTerm = term.Trim();
-
-                if (string.IsNullOrWhiteSpace(searchTerm))
-                {
-                    return Results.BadRequest("Search term cannot be empty");
-                }
-
-                // Validate pagination parameters
-                page = Math.Max(1, page);
-                pageSize = Math.Clamp(pageSize, 1, 50);
-
-                Expression<Func<Files, bool>> filter = f =>
-                f.LastCheckAccessible == true &&
-                !string.IsNullOrEmpty(f.Conference);
-
-                var query = db.Files
-                    .Where(filter);
-
-                if (fileTypeRequested.ToLower() == "all")
-                {
-                    query = query.Where(f => 
-                    f.Extension.ToLower() == ".mp4" || 
-                    f.Extension.ToLower() == ".pdf" || 
-                    f.Extension.ToLower() == ".srt" || 
-                    f.Extension.ToLower() == ".txt");
-                }
-                else { 
-                    query = query.Where(f => f.Extension.ToLower() == $".{fileTypeRequested}");
-                }
-
-                if (!string.IsNullOrEmpty(term) && term.ToLower() != "all")
-                {
-                    query = query.Where(f => EF.Functions.ILike(f.File_Name, $"%{searchTerm}%"));
-                }
-                
-                if (!string.IsNullOrEmpty(conference) && conference.ToLower() != "all")
-                {
-                    query = query.Where(f => !string.IsNullOrEmpty(f.Conference) &&
-                    EF.Functions.ILike(f.Conference, conference));
-                }
-                
-                query = query.OrderBy(f => f.Conference)
-                    .ThenBy(f => f.File_Name);
-
-                var totalCount = await query.CountAsync();
-                var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
-
-                var files = await query
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
-                    .ToListAsync();
+            async Task<IResult> GetSearchFilesByTypeConferenceAndTerm(IFilesService _filesService, string fileTypeRequested, string conference, string term, int page = 1, int pageSize = 10)
+            {
+                var result = await _filesService.SearchFilesByTypeConferenceAndTerm(
+                    fileTypeRequested,
+                    conference,
+                    term,
+                    page,
+                    pageSize);
 
                 return Results.Json(new
                 {
                     Conference = conference,
                     FileType = fileTypeRequested,
-                    SearchTerm = searchTerm,
-                    Files = files,
+                    SearchTerm = term,
+                    Files = result.Files,
                     Pagination = new
                     {
                         CurrentPage = page,
                         PageSize = pageSize,
-                        TotalPages = totalPages,
-                        TotalFiles = totalCount,
+                        TotalPages = result.Pagination.TotalPages,
+                        TotalFiles = result.Pagination.TotalFiles,
                         HasPreviousPage = page > 1,
-                        HasNextPage = page < totalPages
+                        HasNextPage = result.Pagination.HasNextPage
                     }
                 });
             }

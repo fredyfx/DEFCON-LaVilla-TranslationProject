@@ -4,6 +4,8 @@ using defconflix.Extensions;
 using defconflix.Interfaces;
 using defconflix.Middleware;
 using defconflix.Services;
+using defconflix.WebAPI.Interfaces;
+using defconflix.WebAPI.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +38,7 @@ builder.Services.AddScoped<IFileTextService, FileTextService>();
 builder.Services.AddScoped<IFileCheckerService, FileCheckerService>();
 builder.Services.AddScoped<ICrawlerCancellationService, CrawlerCancellationService>();
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
+builder.Services.AddScoped<IFilesService, FilesService>();
 builder.Services.AddRazorPages();
 // Add Background Services
 builder.Services.AddFileCheckBackgroundService();
