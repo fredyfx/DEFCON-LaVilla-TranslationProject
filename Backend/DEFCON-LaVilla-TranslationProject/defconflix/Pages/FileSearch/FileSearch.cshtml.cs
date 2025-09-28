@@ -67,7 +67,6 @@ namespace defconflix.Pages.FileSearch
         {
             public long Id { get; set; }
             public string DisplayName { get; set; } = string.Empty;
-            public int FileCount { get; set; }
         }
 
         public class ApiFilesResponse
@@ -78,7 +77,14 @@ namespace defconflix.Pages.FileSearch
 
         public async Task<IActionResult> OnGetAsync()
         {
-            //await LoadAvailableConferencesAsync();
+            AvailableConferences = await _dbContext.Conferences
+                .OrderBy(c => c.Name)
+                .Select(c => new ConferenceInfo
+                {
+                    Id = c.Id,
+                    DisplayName = c.Name
+                })
+                .ToListAsync();
 
             if (string.IsNullOrEmpty(FileType) && string.IsNullOrEmpty(SearchTerm))
             {

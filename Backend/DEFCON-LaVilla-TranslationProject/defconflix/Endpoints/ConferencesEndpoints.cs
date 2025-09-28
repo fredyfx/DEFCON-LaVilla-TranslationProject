@@ -15,11 +15,7 @@ namespace defconflix.Endpoints
         {
             try
             {
-                var conferences = await db.Files
-                    .Where(f => !string.IsNullOrEmpty(f.Conference))
-                    .Select(f => f.Conference)
-                    .Distinct()
-                    .ToListAsync();
+                var conferences = await db.Conferences.ToListAsync();
 
                 return Results.Json(new { Conferences = conferences });
             }

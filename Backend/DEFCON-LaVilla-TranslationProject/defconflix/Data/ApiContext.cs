@@ -1,4 +1,5 @@
 ﻿using defconflix.Models;
+using defconflix.WebAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace defconflix.Data
@@ -16,6 +17,7 @@ namespace defconflix.Data
         public DbSet<FileStatusCheck> FileStatusChecks { get; set; }
         public DbSet<CrawlerJob> CrawlerJobs { get; set; }
         public DbSet<ProblematicUri> ProblematicUris { get; set; }
+        public DbSet<Conference> Conferences { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

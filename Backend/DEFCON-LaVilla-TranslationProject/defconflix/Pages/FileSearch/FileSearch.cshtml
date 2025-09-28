@@ -21,20 +21,21 @@
                                 <label for="fileType" class="form-label">File Type</label>
                                 <select class="form-select" id="fileType" name="fileType" asp-for="FileType">
                                     <option value="">Select file type</option>
+                                    <option value="all">All Types</option>
                                     <option value="mp4">MP4 Videos</option>
                                     <option value="pdf">PDF Documents</option>
                                     <option value="srt">SRT Subtitles</option>
                                     <option value="txt">Text Files</option>
-                                    <option value="all">All Types</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
                                 <label for="conference" class="form-label">Conference</label>
                                 <select class="form-select" id="conference" name="conference" asp-for="Conference">
                                     <option value="">Select conference</option>
+                                    <option value="all">All Conferences</option>
                                     @foreach (var conf in Model.AvailableConferences)
                                     {
-                                        <option value="@conf.Id">@conf.DisplayName (@conf.FileCount files)</option>
+                                        <option value="@conf.Id">@conf.DisplayName</option>
                                     }
                                 </select>
                             </div>
