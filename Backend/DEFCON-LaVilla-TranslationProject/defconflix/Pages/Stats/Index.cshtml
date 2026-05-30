@@ -1,0 +1,259 @@
+@page "/stats"
+@model defconflix.Pages.Stats.IndexModel
+@{
+    ViewData["Title"] = "Statistics";
+}
+
+<div class="stats-container">
+    <div class="stats-header">
+        <h2>Statistics</h2>
+        <p class="subtitle">Project progress and contributor stats</p>
+    </div>
+
+    <section class="overview-stats">
+        <h3>Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalFiles.ToString("N0")</span>
+                <span class="stat-label">Total Files</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalVideos.ToString("N0")</span>
+                <span class="stat-label">Videos</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalPdfs.ToString("N0")</span>
+                <span class="stat-label">PDFs</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalSubtitles.ToString("N0")</span>
+                <span class="stat-label">Subtitles</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalConferences</span>
+                <span class="stat-label">Conferences</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="translation-stats">
+        <h3>Translation Progress</h3>
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <span class="stat-value">@Model.TotalTranslations.ToString("N0")</span>
+                <span class="stat-label">VTT Files</span>
+            </div>
+            <div class="stat-card completed">
+                <span class="stat-value">@Model.CompletedFiles.ToString("N0")</span>
+                <span class="stat-label">Completed</span>
+            </div>
+            <div class="stat-card in-progress">
+                <span class="stat-value">@Model.InProgressFiles.ToString("N0")</span>
+                <span class="stat-label">In Progress</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">@Model.TotalContributors</span>
+                <span class="stat-label">Contributors</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="two-column">
+        <section class="contributors-section">
+            <h3>Top Contributors</h3>
+            @if (Model.TopContributors.Any())
+            {
+                <div class="contributors-list">
+                    @foreach (var (contributor, index) in Model.TopContributors.Select((c, i) => (c, i)))
+                    {
+                        <div class="contributor-item">
+                            <span class="rank">@(index + 1)</span>
+                            <span class="name">@contributor.Name</span>
+                            <span class="count">@contributor.FilesProcessed files</span>
+                            <span class="completed">(@contributor.CompletedCount completed)</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No contributors yet</p>
+            }
+        </section>
+
+        <section class="progress-section">
+            <h3>Conference Progress</h3>
+            @if (Model.ConferenceProgressList.Any())
+            {
+                <div class="progress-list">
+                    @foreach (var conf in Model.ConferenceProgressList)
+                    {
+                        <div class="progress-item">
+                            <div class="progress-header">
+                                <span class="conf-name">@conf.Name</span>
+                                <span class="progress-text">@conf.CompletedFiles / @conf.TotalFiles</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: @conf.ProgressPercentage.ToString("F0")%"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No conference data</p>
+            }
+        </section>
+    </div>
+</div>
+
+<style>
+    .stats-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .stats-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .stats-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    section {
+        margin-bottom: 2rem;
+    }
+
+    h3 {
+        color: #0f0;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+        text-align: center;
+        transition: border-color 0.2s;
+    }
+
+    .stat-card:hover {
+        border-color: #0f0;
+    }
+
+    .stat-value {
+        display: block;
+        font-size: 2rem;
+        color: #0f0;
+        font-weight: bold;
+    }
+
+    .stat-label {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .stat-card.highlight .stat-value { color: #0ff; }
+    .stat-card.completed .stat-value { color: #0f0; }
+    .stat-card.in-progress .stat-value { color: #ff0; }
+
+    .two-column {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    @@media (max-width: 768px) {
+        .two-column {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .contributors-section, .progress-section {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+    }
+
+    .contributors-list, .progress-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .contributor-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border-left: 3px solid #0f0;
+    }
+
+    .rank {
+        width: 24px;
+        height: 24px;
+        background: #0f0;
+        color: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.8rem;
+    }
+
+    .contributor-item:nth-child(1) .rank { background: gold; }
+    .contributor-item:nth-child(2) .rank { background: silver; }
+    .contributor-item:nth-child(3) .rank { background: #cd7f32; }
+
+    .name { color: #fff; flex: 1; }
+    .count { color: #0ff; }
+    .completed { color: #888; font-size: 0.85rem; }
+
+    .progress-item {
+        padding: 0.5rem 0;
+    }
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+    }
+
+    .conf-name { color: #fff; font-size: 0.9rem; }
+    .progress-text { color: #888; font-size: 0.8rem; }
+
+    .progress-bar {
+        height: 8px;
+        background: #333;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #0f0, #0ff);
+        transition: width 0.3s;
+    }
+
+    .no-data {
+        color: #666;
+        font-style: italic;
+    }
+</style>

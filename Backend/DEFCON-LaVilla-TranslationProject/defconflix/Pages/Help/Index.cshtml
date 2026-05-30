@@ -1,0 +1,291 @@
+@page "/help"
+@model defconflix.Pages.Help.IndexModel
+@{
+    ViewData["Title"] = "Help";
+}
+
+<div class="help-container">
+    <div class="help-header">
+        <h2>Help & Documentation</h2>
+        <p class="subtitle">How to use the DEFCON Translation Project</p>
+    </div>
+
+    <section class="faq-section">
+        <h3>Getting Started</h3>
+
+        <div class="faq-item">
+            <h4>What is this project?</h4>
+            <p>
+                The DEFCON La Villa Translation Project aims to translate DEFCON conference content
+                (videos, presentations, subtitles) into Spanish to make this knowledge accessible
+                to the Spanish-speaking security community.
+            </p>
+        </div>
+
+        <div class="faq-item">
+            <h4>How do I get an API key?</h4>
+            <p>
+                Contact the project maintainers through GitHub or the DEFCON La Villa community
+                to request access. Once approved, you'll receive an API key to authenticate your requests.
+            </p>
+        </div>
+
+        <div class="faq-item">
+            <h4>How do I search for files?</h4>
+            <p>
+                Use the <a href="/files/search">File Search</a> page to browse and filter files by:
+            </p>
+            <ul>
+                <li><strong>File Type:</strong> MP4 (videos), PDF (slides), SRT/TXT (subtitles)</li>
+                <li><strong>Conference:</strong> Filter by specific DEFCON year or event</li>
+                <li><strong>Search Term:</strong> Search by filename or keywords</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="faq-section">
+        <h3>Contributing Translations</h3>
+
+        <div class="faq-item">
+            <h4>How do I submit a translation?</h4>
+            <ol>
+                <li>Find a file that needs translation (status: "Not Started" or "In Progress")</li>
+                <li>Download the original subtitle file (.srt or .txt)</li>
+                <li>Translate the content using your preferred subtitle editor</li>
+                <li>Submit the translated file through the API or web interface</li>
+            </ol>
+        </div>
+
+        <div class="faq-item">
+            <h4>What format should translations be in?</h4>
+            <p>
+                We accept VTT (WebVTT) and SRT formats. Maintain the original timing cues
+                and structure. Each translation should include:
+            </p>
+            <ul>
+                <li>Target language code (e.g., "es" for Spanish)</li>
+                <li>Properly formatted subtitles with timing</li>
+                <li>Accurate translations that preserve technical terminology</li>
+            </ul>
+        </div>
+
+        <div class="faq-item">
+            <h4>Translation guidelines</h4>
+            <ul>
+                <li>Keep technical terms in English when there's no common Spanish equivalent</li>
+                <li>Maintain hacker/security community terminology</li>
+                <li>Preserve the speaker's tone and style</li>
+                <li>Include context notes for cultural references if needed</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="faq-section">
+        <h3>API Usage</h3>
+
+        <div class="faq-item">
+            <h4>Authentication</h4>
+            <p>Include your API key in the request header:</p>
+            <code class="code-block">X-Api-Key: your_api_key_here</code>
+        </div>
+
+        <div class="faq-item">
+            <h4>Common Endpoints</h4>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <code>GET /api/files/search</code>
+                    <span>Search for files</span>
+                </div>
+                <div class="endpoint">
+                    <code>GET /api/files/download?ids=1,2,3</code>
+                    <span>Download file URLs</span>
+                </div>
+                <div class="endpoint">
+                    <code>POST /api/translations</code>
+                    <span>Submit a translation</span>
+                </div>
+                <div class="endpoint">
+                    <code>GET /api/translations/my</code>
+                    <span>List your translations</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <h4>Batch Download Script</h4>
+            <p>
+                Download our <a href="/api/tools/downloader">batch downloader script</a> to
+                efficiently download multiple files at once.
+            </p>
+        </div>
+    </section>
+
+    <section class="faq-section">
+        <h3>Status Definitions</h3>
+        <div class="status-list">
+            <div class="status-item">
+                <span class="status-badge not-started">Not Started</span>
+                <span>No translation work has begun</span>
+            </div>
+            <div class="status-item">
+                <span class="status-badge in-progress">In Progress</span>
+                <span>Someone is actively working on translation</span>
+            </div>
+            <div class="status-item">
+                <span class="status-badge completed">Completed</span>
+                <span>Translation is finished and reviewed</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="faq-section">
+        <h3>Need More Help?</h3>
+        <p>
+            Check out the <a href="https://github.com/fredyfx/DEFCON-LaVilla-TranslationProject" target="_blank">GitHub repository</a>
+            for issues, discussions, and to contribute to the project.
+        </p>
+    </section>
+</div>
+
+<style>
+    .help-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .help-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .help-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    .faq-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .faq-section h3 {
+        color: #0f0;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .faq-item {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .faq-item h4 {
+        color: #0ff;
+        margin-top: 0;
+        margin-bottom: 0.75rem;
+    }
+
+    .faq-item p {
+        color: #ccc;
+        margin-bottom: 0.5rem;
+    }
+
+    .faq-item ul, .faq-item ol {
+        color: #ccc;
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+    }
+
+    .faq-item li {
+        margin-bottom: 0.25rem;
+    }
+
+    .faq-item a {
+        color: #0ff;
+    }
+
+    .code-block {
+        display: block;
+        padding: 1rem;
+        background: #000;
+        color: #0f0;
+        font-family: monospace;
+        margin-top: 0.5rem;
+    }
+
+    .endpoint-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .endpoint {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .endpoint code {
+        color: #0f0;
+        font-family: monospace;
+        min-width: 250px;
+    }
+
+    .endpoint span {
+        color: #888;
+    }
+
+    .status-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        border: 1px solid;
+        min-width: 100px;
+        text-align: center;
+    }
+
+    .status-badge.not-started {
+        border-color: #888;
+        color: #888;
+    }
+
+    .status-badge.in-progress {
+        border-color: #ff0;
+        color: #ff0;
+        background: rgba(255, 255, 0, 0.1);
+    }
+
+    .status-badge.completed {
+        border-color: #0f0;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .status-item > span:last-child {
+        color: #ccc;
+    }
+</style>

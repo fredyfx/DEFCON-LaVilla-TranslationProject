@@ -1,0 +1,337 @@
+@page "/admin/jobs"
+@model defconflix.Pages.Admin.JobsModel
+@{
+    ViewData["Title"] = "Job Monitor";
+}
+
+<div class="jobs-container">
+    <div class="jobs-header">
+        <h2>📋 Job Monitor</h2>
+        <p class="subtitle">Background Job Management</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Message))
+    {
+        <div class="alert alert-success">@Model.Message</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="alert alert-error">@Model.Error</div>
+    }
+
+    <div class="queue-status">
+        <span class="queue-label">Queue Status:</span>
+        <span class="queue-value">@Model.QueueDepth items</span>
+        <form method="post" asp-page-handler="StartFileCheck" class="inline-form">
+            <button type="submit" class="btn-action">🔄 Start File Check (Needed)</button>
+        </form>
+    </div>
+
+    <section class="jobs-section">
+        <h3>⚡ File Check Jobs</h3>
+        @if (Model.FileCheckJobs.Any())
+        {
+            <div class="jobs-table-wrapper">
+                <table class="jobs-table">
+                    <thead>
+                        <tr>
+                            <th>Job ID</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Files</th>
+                            <th>Available</th>
+                            <th>Unavailable</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var job in Model.FileCheckJobs.OrderByDescending(j => j.StartedAt))
+                        {
+                            <tr class="status-row-@job.StatusText.ToLower()">
+                                <td class="job-id">@job.JobId[..8]...</td>
+                                <td>
+                                    <span class="status-badge status-@job.StatusText.ToLower()">@job.StatusText</span>
+                                </td>
+                                <td>
+                                    <div class="progress-cell">
+                                        <div class="mini-progress">
+                                            <div class="mini-progress-fill" style="width: @job.ProgressPercentage%"></div>
+                                        </div>
+                                        <span>@job.ProgressPercentage.ToString("F0")%</span>
+                                    </div>
+                                </td>
+                                <td>@job.ProcessedFiles / @job.TotalFiles</td>
+                                <td class="available">@job.AvailableFiles</td>
+                                <td class="unavailable">@job.UnavailableFiles</td>
+                                <td>@job.StartedAt.ToString("HH:mm:ss")</td>
+                                <td>@(job.Duration?.ToString(@"hh\:mm\:ss") ?? "-")</td>
+                                <td>
+                                    @if (!job.IsCompleted)
+                                    {
+                                        <form method="post" asp-page-handler="CancelFileCheck" class="inline-form">
+                                            <input type="hidden" name="jobId" value="@job.JobId" />
+                                            <button type="submit" class="btn-cancel">Cancel</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="completed-label">Done</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="no-data">No file check jobs found</p>
+        }
+    </section>
+
+    <section class="jobs-section">
+        <h3>🕷️ Crawler Jobs</h3>
+        @if (Model.CrawlerJobs.Any())
+        {
+            <div class="jobs-table-wrapper">
+                <table class="jobs-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>URL</th>
+                            <th>Found</th>
+                            <th>Success</th>
+                            <th>Errors</th>
+                            <th>Rate</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var job in Model.CrawlerJobs)
+                        {
+                            <tr class="status-row-@job.Status.ToLower().Replace(" ", "-")">
+                                <td class="job-id">#@job.Id</td>
+                                <td>
+                                    <span class="status-badge status-@job.Status.ToLower().Replace(" ", "-")">@job.Status</span>
+                                </td>
+                                <td class="url-cell" title="@job.StartUrl">
+                                    @(job.StartUrl.Length > 40 ? job.StartUrl[..40] + "..." : job.StartUrl)
+                                </td>
+                                <td>@job.FilesFound</td>
+                                <td class="available">@job.FilesSuccessful</td>
+                                <td class="unavailable">@job.FilesWithErrors</td>
+                                <td>@job.SuccessRate.ToString("F1")%</td>
+                                <td>@job.StartTime.ToString("MM/dd HH:mm")</td>
+                                <td>@(job.Duration?.ToString(@"hh\:mm\:ss") ?? "-")</td>
+                                <td>
+                                    @if (job.CanBeCancelled && !job.IsCancellationRequested)
+                                    {
+                                        <form method="post" asp-page-handler="CancelCrawler" class="inline-form">
+                                            <input type="hidden" name="jobId" value="@job.Id" />
+                                            <button type="submit" class="btn-cancel">Cancel</button>
+                                        </form>
+                                    }
+                                    else if (job.IsCancellationRequested)
+                                    {
+                                        <span class="cancelling-label">Cancelling...</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="completed-label">Done</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="no-data">No crawler jobs found</p>
+        }
+    </section>
+
+    <div class="back-link">
+        <a href="/admin">← Back to Dashboard</a>
+    </div>
+</div>
+
+<style>
+    .jobs-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .jobs-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .jobs-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    .alert {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border: 1px solid;
+    }
+
+    .alert-success {
+        border-color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+        color: #0f0;
+    }
+
+    .alert-error {
+        border-color: #f00;
+        background: rgba(255, 0, 0, 0.1);
+        color: #f00;
+    }
+
+    .queue-status {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .queue-label { color: #888; }
+    .queue-value { color: #0f0; font-weight: bold; }
+
+    .inline-form { display: inline; margin-left: auto; }
+
+    .btn-action {
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #0f0;
+        color: #0f0;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+    }
+
+    .btn-action:hover {
+        background: rgba(0, 255, 0, 0.2);
+    }
+
+    .jobs-section {
+        margin-bottom: 2rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+    }
+
+    .jobs-section h3 {
+        color: #0f0;
+        margin-top: 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .jobs-table-wrapper {
+        overflow-x: auto;
+    }
+
+    .jobs-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .jobs-table th, .jobs-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #333;
+    }
+
+    .jobs-table th {
+        background: rgba(0, 255, 0, 0.1);
+        color: #0f0;
+        font-weight: normal;
+        white-space: nowrap;
+    }
+
+    .job-id { font-family: monospace; color: #0ff; }
+    .url-cell { font-family: monospace; font-size: 0.8rem; color: #888; }
+
+    .status-badge {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        border: 1px solid;
+    }
+
+    .status-running { border-color: #ff0; color: #ff0; background: rgba(255, 255, 0, 0.1); }
+    .status-completed { border-color: #0f0; color: #0f0; background: rgba(0, 255, 0, 0.1); }
+    .status-failed { border-color: #f00; color: #f00; background: rgba(255, 0, 0, 0.1); }
+    .status-queued { border-color: #888; color: #888; }
+    .status-cancelled { border-color: #f80; color: #f80; background: rgba(255, 136, 0, 0.1); }
+    .status-not-started { border-color: #888; color: #888; }
+
+    .progress-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .mini-progress {
+        width: 60px;
+        height: 6px;
+        background: #333;
+    }
+
+    .mini-progress-fill {
+        height: 100%;
+        background: #0f0;
+    }
+
+    .available { color: #0f0; }
+    .unavailable { color: #f00; }
+
+    .btn-cancel {
+        background: rgba(255, 0, 0, 0.1);
+        border: 1px solid #f00;
+        color: #f00;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+
+    .btn-cancel:hover {
+        background: rgba(255, 0, 0, 0.2);
+    }
+
+    .completed-label { color: #666; font-size: 0.8rem; }
+    .cancelling-label { color: #f80; font-size: 0.8rem; }
+
+    .no-data { color: #666; font-style: italic; padding: 1rem 0; }
+
+    .back-link {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #333;
+    }
+
+    .back-link a {
+        color: #0ff;
+        text-decoration: none;
+    }
+
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+</style>

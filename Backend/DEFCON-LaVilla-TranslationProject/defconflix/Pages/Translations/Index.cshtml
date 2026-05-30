@@ -1,0 +1,214 @@
+@page "/translations"
+@model defconflix.Pages.Translations.IndexModel
+@{
+    ViewData["Title"] = "My Translations";
+}
+
+<div class="translations-container">
+    <div class="translations-header">
+        <h2>My Translations</h2>
+        <p class="subtitle">Your translation contributions</p>
+    </div>
+
+    <div class="summary-stats">
+        <div class="summary-item">
+            <span class="summary-value">@Model.TotalTranslations</span>
+            <span class="summary-label">Translations</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-value">@Model.TotalCues.ToString("N0")</span>
+            <span class="summary-label">Total Cues</span>
+        </div>
+    </div>
+
+    @if (Model.Translations.Any())
+    {
+        <div class="translations-list">
+            @foreach (var trans in Model.Translations)
+            {
+                <div class="translation-card">
+                    <div class="card-header">
+                        <span class="filename">@trans.FileName</span>
+                        <span class="lang-badge">@trans.Language</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="meta-row">
+                            <span class="meta-item">
+                                <span class="meta-label">Cues:</span>
+                                <span class="meta-value">@trans.CueCount</span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Created:</span>
+                                <span class="meta-value">@trans.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Updated:</span>
+                                <span class="meta-value">@trans.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <a href="/api/vtt/@trans.Id" class="btn-download">Download VTT</a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="no-data">
+            <h3>No translations yet</h3>
+            <p>Start contributing by picking a file from the <a href="/files/search">File Search</a> page.</p>
+        </div>
+    }
+</div>
+
+<style>
+    .translations-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .translations-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .translations-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    .summary-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+    }
+
+    .summary-item {
+        text-align: center;
+    }
+
+    .summary-value {
+        display: block;
+        font-size: 2rem;
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .summary-label {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .translations-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .translation-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        transition: border-color 0.2s;
+    }
+
+    .translation-card:hover {
+        border-color: #0f0;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .filename {
+        color: #0ff;
+        font-weight: bold;
+        word-break: break-all;
+    }
+
+    .lang-badge {
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        border: 1px solid #0f0;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .meta-row {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .meta-item {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .meta-label {
+        color: #888;
+    }
+
+    .meta-value {
+        color: #fff;
+    }
+
+    .card-actions {
+        padding: 1rem;
+        border-top: 1px solid #333;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-download {
+        padding: 0.5rem 1rem;
+        background: rgba(0, 255, 255, 0.1);
+        border: 1px solid #0ff;
+        color: #0ff;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .btn-download:hover {
+        background: rgba(0, 255, 255, 0.2);
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .no-data h3 {
+        color: #888;
+        margin-bottom: 0.5rem;
+    }
+
+    .no-data p {
+        color: #666;
+    }
+
+    .no-data a {
+        color: #0ff;
+    }
+</style>

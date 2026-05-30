@@ -1,0 +1,593 @@
+@page
+@model defconflix.Pages.IndexModel
+@{
+    ViewData["Title"] = "Command Center";
+}
+
+<div class="home-container">
+    <div class="hero-section">
+        <h2>🖥️ Command Center</h2>
+        <p class="subtitle">DEFCON La Villa Hacker - Translation Project</p>
+    </div>
+
+    <section class="home-section">
+        <h3>👋 Welcome</h3>
+        <p>
+            Welcome to the Command Center of a project from La Villa Hacker!
+            This platform is designed to help you process, translate, and analyze multimedia files
+            using AI technologies.
+        </p>
+    </section>
+
+    <section class="home-section">
+        <h3>🎯 Project Goals</h3>
+        <ul class="goals-list">
+            <li>Be able to search inside of the videos and PDFs.</li>
+            <li>Be able to share great content with our friends that don't speak English by providing them a good searching tool for video content and get the subtitles in a target language.</li>
+        </ul>
+        <p class="note">
+            We know that YouTube and other platforms are very restrictive with their content.
+            The FTP Media Server of DEFCON and INFOCON already have great content.
+        </p>
+    </section>
+
+    <section class="home-section">
+        <h3>🔄 In a Nutshell</h3>
+        <div class="workflow-box">
+            <div class="workflow-item">
+                <span class="workflow-label">Videos</span>
+                <span class="workflow-arrow">→</span>
+                <span>Transcribe (TXT and VTT File Generated)</span>
+                <span class="workflow-arrow">→</span>
+                <span>Translate (another TXT and VTT File Generated)</span>
+                <span class="workflow-arrow">→</span>
+                <span>Summarize</span>
+                <span class="workflow-arrow">→</span>
+                <span class="workflow-result">Searchable Text</span>
+            </div>
+            <div class="workflow-item">
+                <span class="workflow-label">PDFs</span>
+                <span class="workflow-arrow">→</span>
+                <span>Convert to Markdown</span>
+                <span class="workflow-arrow">→</span>
+                <span>Translate</span>
+                <span class="workflow-arrow">→</span>
+                <span>Summarize</span>
+                <span class="workflow-arrow">→</span>
+                <span class="workflow-result">Searchable Text</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🗺️ Roadmap</h3>
+        <div class="roadmap-list">
+            <div class="roadmap-item completed">
+                <span class="phase">Phase 0</span>
+                <span class="description">Develop the initial proof of concept</span>
+                <span class="status badge-completed">Completed</span>
+            </div>
+            <div class="roadmap-item completed">
+                <span class="phase">Phase 1</span>
+                <span class="description">Develop the API</span>
+                <span class="status badge-completed">Completed (seems stable)</span>
+            </div>
+            <div class="roadmap-item in-progress">
+                <span class="phase">Phase 2</span>
+                <span class="description">Develop the Client for processing mp4 files</span>
+                <span class="status badge-progress">In Progress</span>
+            </div>
+            <div class="roadmap-item queued">
+                <span class="phase">Phase 3</span>
+                <span class="description">Develop the Client for VTT Files translation</span>
+                <span class="status badge-queued">On Queue</span>
+            </div>
+            <div class="roadmap-item queued">
+                <span class="phase">Phase 4</span>
+                <span class="description">Develop the Client for processing PDF Files to markdown and translate them</span>
+                <span class="status badge-queued">On Queue</span>
+            </div>
+            <div class="roadmap-item queued">
+                <span class="phase">Phase 5</span>
+                <span class="description">Develop the Summarization Engine for text files (VTT and PDFs in markdown)</span>
+                <span class="status badge-queued">On Queue</span>
+            </div>
+            <div class="roadmap-item queued help-needed">
+                <span class="phase">Phase 6</span>
+                <span class="description">Develop the Search Engine with Vectorized Embeddings</span>
+                <span class="status badge-queued">On Queue</span>
+                <span class="help-badge">Help Required</span>
+            </div>
+            <div class="roadmap-item queued help-needed">
+                <span class="phase">Phase 7</span>
+                <span class="description">Integrate with LLMs</span>
+                <span class="status badge-queued">On Queue</span>
+                <span class="help-badge">Help Required</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🔐 Authentication Endpoints</h3>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/login</code>
+                <span class="description">Start GitHub OAuth flow</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/profile</code>
+                <span class="description">View profile, API key and JWT token (requires GitHub OAuth). Web Interface.</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/logout</code>
+                <span class="description">Logout</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/reset-key</code>
+                <span class="description">Reset API key (requires GitHub OAuth)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/auth/token</code>
+                <span class="description">Get JWT token using API key</span>
+            </div>
+        </div>
+        <p class="note">* Note: RefreshToken is not implemented, yet.</p>
+    </section>
+
+    <section class="home-section">
+        <h3>🛡️ Protected Endpoints</h3>
+        <p class="section-description">Require Bearer token or X-API-Key header</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/protected/user-info</code>
+                <span class="description">Get user information</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/protected/user-stats</code>
+                <span class="description">Get detailed user statistics</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>📁 File Processing Endpoints</h3>
+        <p class="section-description">Require X-API-Key header</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/vttfile/start</code>
+                <span class="description">Initialize the processing of files</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/vttfile/completed/{id}</code>
+                <span class="description">Finalize the processing of files</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/vttfile/export/{id}</code>
+                <span class="description">Export the processed file (pure TXT for now)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/vttcue</code>
+                <span class="description">Updating the database along your processing on-demand</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🔍 File Search Endpoints</h3>
+        <p class="section-description">Require X-API-Key header</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/file/{id}</code>
+                <span class="description">Get detail of a file</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/file/search/{filename}</code>
+                <span class="description">Search by filename (exact match)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/files/{type}</code>
+                <span class="description">List by mp4, pdf, srt, txt</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/files/{type}?page=5&pagesize=20</code>
+                <span class="description">Pagination available</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/files/{type}/conference/{conference}/search/{term}?page=1&pagesize=20</code>
+                <span class="description">Search inside text files (case insensitive)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/files/download?ids=1,2,3...</code>
+                <span class="description">Download up to 20 Ids (returns text file)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/files/download</code>
+                <span class="description">Download more than 20 (body: Ids[])</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/admin/dashboard</code>
+                <span class="description">Admin dashboard with stats (idea for now)</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/users</code>
+                <span class="description">List all users with pagination</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🌐 Public Access</h3>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/tools/downloader</code>
+                <span class="description">Script to download videos inside a text file</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>👑 Admin Endpoints</h3>
+        <p class="section-description">Require Admin Role</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/background/jobs/{jobId}/status</code>
+                <span class="description">Get job status</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/background/jobs/active</code>
+                <span class="description">Get all active jobs</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/background/jobs/queue/status</code>
+                <span class="description">Get queue status</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/background/jobs/{jobId}/cancel</code>
+                <span class="description">Cancel a job</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/background/jobs/check-files</code>
+                <span class="description">Start file check job for specific files</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/background/jobs/check-all</code>
+                <span class="description">Start job to check all files</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/background/jobs/check-needed</code>
+                <span class="description">Start job to check files not checked in 24h</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>⏱️ Rate Limits</h3>
+        <div class="rate-limits">
+            <div class="rate-item">
+                <span class="rate-type">Auth endpoints</span>
+                <span class="rate-value">10 requests/minute</span>
+            </div>
+            <div class="rate-item">
+                <span class="rate-type">API Key endpoints</span>
+                <span class="rate-value">100 requests/minute</span>
+            </div>
+            <div class="rate-item">
+                <span class="rate-type">Authenticated endpoints</span>
+                <span class="rate-value">500 requests/minute (token bucket)</span>
+            </div>
+            <div class="rate-item">
+                <span class="rate-type">Global</span>
+                <span class="rate-value">20 requests/minute</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🔑 Authentication Methods</h3>
+        <div class="auth-methods">
+            <div class="auth-item">
+                <span class="auth-number">1</span>
+                <code>Authorization: Bearer &lt;jwt-token&gt;</code>
+            </div>
+            <div class="auth-item">
+                <span class="auth-number">2</span>
+                <code>X-API-Key: &lt;your-guid-here&gt;</code>
+            </div>
+        </div>
+    </section>
+</div>
+
+<style>
+    .home-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .hero-section {
+        text-align: center;
+        padding: 2rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .hero-section h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        color: #0ff;
+        font-size: 1.2rem;
+    }
+
+    .home-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .home-section h3 {
+        margin-top: 0;
+        color: #0f0;
+        border-bottom: 1px solid #333;
+        padding-bottom: 0.5rem;
+    }
+
+    .section-description {
+        color: #888;
+        font-size: 0.9rem;
+        margin: 0.5rem 0 1rem 0;
+    }
+
+    .note {
+        color: #888;
+        font-size: 0.9rem;
+        font-style: italic;
+        margin-top: 1rem;
+    }
+
+    .goals-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .goals-list li {
+        padding: 0.5rem 0;
+        padding-left: 1.5rem;
+        position: relative;
+    }
+
+    .goals-list li::before {
+        content: "▸";
+        color: #0f0;
+        position: absolute;
+        left: 0;
+    }
+
+    /* Workflow */
+    .workflow-box {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+    }
+
+    .workflow-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .workflow-label {
+        background: #0f0;
+        color: #000;
+        padding: 0.25rem 0.75rem;
+        font-weight: bold;
+    }
+
+    .workflow-arrow {
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .workflow-result {
+        color: #0f0;
+        font-weight: bold;
+    }
+
+    /* Roadmap */
+    .roadmap-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .roadmap-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+        flex-wrap: wrap;
+    }
+
+    .roadmap-item .phase {
+        min-width: 70px;
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .roadmap-item .description {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .roadmap-item .status {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        border: 1px solid;
+    }
+
+    .badge-completed {
+        border-color: #0f0 !important;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .badge-progress {
+        border-color: #ff0 !important;
+        color: #ff0;
+        background: rgba(255, 255, 0, 0.1);
+    }
+
+    .badge-queued {
+        border-color: #888 !important;
+        color: #888;
+        background: rgba(128, 128, 128, 0.1);
+    }
+
+    .help-badge {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        border: 1px solid #f0f;
+        color: #f0f;
+        background: rgba(255, 0, 255, 0.1);
+    }
+
+    /* Endpoints */
+    .endpoints-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .endpoint-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+        flex-wrap: wrap;
+    }
+
+    .endpoint-item .method {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: bold;
+        min-width: 50px;
+        text-align: center;
+        border: 1px solid;
+    }
+
+    .endpoint-item .method.get {
+        border-color: #0f0;
+        color: #0f0;
+    }
+
+    .endpoint-item .method.post {
+        border-color: #ff0;
+        color: #ff0;
+    }
+
+    .endpoint-item code {
+        color: #0ff;
+        flex-shrink: 0;
+    }
+
+    .endpoint-item .description {
+        color: #888;
+        font-size: 0.9rem;
+        flex: 1;
+        min-width: 200px;
+    }
+
+    /* Rate Limits */
+    .rate-limits {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .rate-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .rate-type {
+        color: #888;
+    }
+
+    .rate-value {
+        color: #0f0;
+        font-family: monospace;
+    }
+
+    /* Auth Methods */
+    .auth-methods {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .auth-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        border: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-number {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #0f0;
+        color: #0f0;
+        font-weight: bold;
+    }
+
+    .auth-item code {
+        color: #0ff;
+    }
+</style>

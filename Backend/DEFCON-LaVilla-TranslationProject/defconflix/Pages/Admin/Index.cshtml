@@ -1,0 +1,359 @@
+@page "/admin"
+@model defconflix.Pages.Admin.IndexModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>🛡️ Admin Dashboard</h2>
+        <p class="subtitle">System Overview</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">@Model.TotalFiles.ToString("N0")</div>
+            <div class="stat-label">Total Files</div>
+            <div class="stat-detail">
+                <span class="accessible">@Model.AccessibleFiles accessible</span> /
+                <span class="inaccessible">@Model.InaccessibleFiles inaccessible</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.TotalUsers</div>
+            <div class="stat-label">Active Users</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.TotalTranslations</div>
+            <div class="stat-label">Completed Translations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@Model.QueueDepth</div>
+            <div class="stat-label">Queue Depth</div>
+            <div class="stat-detail">
+                @if (Model.QueueEmpty)
+                {
+                    <span class="idle">Queue idle</span>
+                }
+                else
+                {
+                    <span class="active">Processing...</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="section-row">
+        <section class="admin-section file-breakdown">
+            <h3>📁 Files by Type</h3>
+            <div class="breakdown-list">
+                <div class="breakdown-item">
+                    <span class="type-icon">🎬</span>
+                    <span class="type-name">MP4 Videos</span>
+                    <span class="type-count">@Model.Mp4Count.ToString("N0")</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="type-icon">📄</span>
+                    <span class="type-name">PDF Documents</span>
+                    <span class="type-count">@Model.PdfCount.ToString("N0")</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="type-icon">📝</span>
+                    <span class="type-name">TXT Files</span>
+                    <span class="type-count">@Model.TxtCount.ToString("N0")</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="type-icon">🎯</span>
+                    <span class="type-name">SRT Subtitles</span>
+                    <span class="type-count">@Model.SrtCount.ToString("N0")</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="admin-section active-jobs">
+            <h3>⚡ Active Jobs <a href="/admin/jobs" class="view-all">View All →</a></h3>
+            @if (Model.ActiveJobs.Any())
+            {
+                <div class="jobs-list">
+                    @foreach (var job in Model.ActiveJobs.Take(5))
+                    {
+                        <div class="job-item">
+                            <div class="job-info">
+                                <span class="job-id">@job.JobId[..8]...</span>
+                                <span class="job-status status-@job.StatusText.ToLower()">@job.StatusText</span>
+                            </div>
+                            <div class="job-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: @job.ProgressPercentage%"></div>
+                                </div>
+                                <span class="progress-text">@job.ProgressPercentage.ToString("F0")%</span>
+                            </div>
+                            <div class="job-detail">@job.ProcessedFiles / @job.TotalFiles files</div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No active jobs</p>
+            }
+        </section>
+    </div>
+
+    <div class="section-row">
+        <section class="admin-section recent-users">
+            <h3>👥 Recent Users</h3>
+            @if (Model.RecentUsers.Any())
+            {
+                <div class="users-list">
+                    @foreach (var user in Model.RecentUsers)
+                    {
+                        <div class="user-item">
+                            <span class="user-name">@user.Username</span>
+                            <span class="user-role role-@user.Role.ToString().ToLower()">@user.Role</span>
+                            <span class="user-time">@user.TimeAgo</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No recent activity</p>
+            }
+        </section>
+
+        <section class="admin-section crawler-jobs">
+            <h3>🕷️ Recent Crawler Jobs</h3>
+            @if (Model.RecentCrawlerJobs.Any())
+            {
+                <div class="crawler-list">
+                    @foreach (var job in Model.RecentCrawlerJobs)
+                    {
+                        <div class="crawler-item">
+                            <div class="crawler-info">
+                                <span class="crawler-id">#@job.Id</span>
+                                <span class="crawler-status status-@job.Status.ToLower().Replace(" ", "-")">@job.Status</span>
+                            </div>
+                            <div class="crawler-stats">
+                                Found: @job.FilesFound | Success: @job.FilesSuccessful | Errors: @job.FilesWithErrors
+                            </div>
+                            <div class="crawler-url" title="@job.StartUrl">@(job.StartUrl.Length > 50 ? job.StartUrl[..50] + "..." : job.StartUrl)</div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No crawler jobs</p>
+            }
+        </section>
+    </div>
+
+    <section class="admin-section quick-actions">
+        <h3>🚀 Quick Actions</h3>
+        <div class="actions-grid">
+            <a href="/admin/jobs" class="action-btn">📋 Job Monitor</a>
+            <a href="/files/search" class="action-btn">🔍 File Search</a>
+            <a href="/conferences" class="action-btn">📂 Conferences</a>
+            <a href="/stats" class="action-btn">📊 Public Stats</a>
+        </div>
+    </section>
+</div>
+
+<style>
+    .admin-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .admin-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .admin-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        color: #888;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+        padding: 1.5rem;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        color: #0f0;
+        font-weight: bold;
+    }
+
+    .stat-label {
+        color: #888;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .stat-detail {
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+    }
+
+    .accessible { color: #0f0; }
+    .inaccessible { color: #f00; }
+    .idle { color: #888; }
+    .active { color: #ff0; }
+
+    .section-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .admin-section {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+    }
+
+    .admin-section h3 {
+        color: #0f0;
+        margin-top: 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .view-all {
+        font-size: 0.8rem;
+        color: #0ff;
+        text-decoration: none;
+    }
+
+    .view-all:hover {
+        text-decoration: underline;
+    }
+
+    .breakdown-list, .jobs-list, .users-list, .crawler-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .breakdown-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .type-icon { font-size: 1.5rem; }
+    .type-name { flex: 1; }
+    .type-count { color: #0f0; font-weight: bold; }
+
+    .job-item, .user-item, .crawler-item {
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .job-info, .crawler-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .job-id, .crawler-id { color: #0ff; font-family: monospace; }
+
+    .job-status, .crawler-status {
+        padding: 0.15rem 0.5rem;
+        font-size: 0.75rem;
+        border: 1px solid;
+    }
+
+    .status-running, .status-running { border-color: #ff0; color: #ff0; }
+    .status-completed { border-color: #0f0; color: #0f0; }
+    .status-failed { border-color: #f00; color: #f00; }
+    .status-queued { border-color: #888; color: #888; }
+    .status-cancelled { border-color: #f80; color: #f80; }
+    .status-not-started { border-color: #888; color: #888; }
+
+    .progress-bar {
+        height: 8px;
+        background: #333;
+        margin-bottom: 0.25rem;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: #0f0;
+        transition: width 0.3s;
+    }
+
+    .progress-text { font-size: 0.8rem; color: #888; }
+    .job-detail { font-size: 0.8rem; color: #888; }
+
+    .user-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .user-name { color: #0ff; }
+    .user-role {
+        padding: 0.15rem 0.5rem;
+        font-size: 0.75rem;
+        border: 1px solid;
+    }
+    .role-admin { border-color: #f0f; color: #f0f; }
+    .role-user { border-color: #888; color: #888; }
+    .user-time { color: #666; font-size: 0.8rem; }
+
+    .crawler-stats { font-size: 0.8rem; color: #888; margin-bottom: 0.25rem; }
+    .crawler-url { font-size: 0.75rem; color: #666; font-family: monospace; }
+
+    .no-data { color: #666; font-style: italic; }
+
+    .quick-actions { margin-top: 1rem; }
+
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .action-btn {
+        display: block;
+        padding: 1rem;
+        text-align: center;
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #0f0;
+        color: #0f0;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        background: rgba(0, 255, 0, 0.2);
+        transform: translateY(-2px);
+    }
+</style>

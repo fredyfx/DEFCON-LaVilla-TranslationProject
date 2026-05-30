@@ -1,0 +1,199 @@
+@page "/conferences"
+@model defconflix.Pages.Conferences.IndexModel
+@{
+    ViewData["Title"] = "Conferences";
+}
+
+<div class="conferences-container">
+    <div class="conferences-header">
+        <h2>📂 Conferences</h2>
+        <p class="subtitle">Browse files by conference</p>
+    </div>
+
+    <div class="summary-stats">
+        <div class="summary-item">
+            <span class="summary-value">@Model.TotalConferences</span>
+            <span class="summary-label">Conferences</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-value">@Model.TotalFiles.ToString("N0")</span>
+            <span class="summary-label">Total Files</span>
+        </div>
+    </div>
+
+    <div class="conferences-grid">
+        @foreach (var conf in Model.Conferences)
+        {
+            <div class="conference-card">
+                <h3 class="conf-name">@conf.Name</h3>
+                <div class="conf-total">@conf.TotalFiles files</div>
+                <div class="conf-breakdown">
+                    @if (conf.Mp4Count > 0)
+                    {
+                        <a href="/files/search?FileType=mp4&Conference=@Uri.EscapeDataString(conf.Name)" class="breakdown-item">
+                            <span class="icon">🎬</span>
+                            <span class="count">@conf.Mp4Count</span>
+                            <span class="type">videos</span>
+                        </a>
+                    }
+                    @if (conf.PdfCount > 0)
+                    {
+                        <a href="/files/search?FileType=pdf&Conference=@Uri.EscapeDataString(conf.Name)" class="breakdown-item">
+                            <span class="icon">📄</span>
+                            <span class="count">@conf.PdfCount</span>
+                            <span class="type">PDFs</span>
+                        </a>
+                    }
+                    @if (conf.TxtCount > 0)
+                    {
+                        <a href="/files/search?FileType=txt&Conference=@Uri.EscapeDataString(conf.Name)" class="breakdown-item">
+                            <span class="icon">📝</span>
+                            <span class="count">@conf.TxtCount</span>
+                            <span class="type">texts</span>
+                        </a>
+                    }
+                    @if (conf.SrtCount > 0)
+                    {
+                        <a href="/files/search?FileType=srt&Conference=@Uri.EscapeDataString(conf.Name)" class="breakdown-item">
+                            <span class="icon">🎯</span>
+                            <span class="count">@conf.SrtCount</span>
+                            <span class="type">subs</span>
+                        </a>
+                    }
+                </div>
+                <a href="/files/search?Conference=@Uri.EscapeDataString(conf.Name)" class="view-all-link">
+                    View All →
+                </a>
+            </div>
+        }
+    </div>
+
+    @if (!Model.Conferences.Any())
+    {
+        <div class="no-data">
+            <p>No conferences found.</p>
+        </div>
+    }
+</div>
+
+<style>
+    .conferences-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .conferences-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .conferences-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    .summary-stats {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+    }
+
+    .summary-item {
+        text-align: center;
+    }
+
+    .summary-value {
+        display: block;
+        font-size: 2rem;
+        color: #0f0;
+        font-weight: bold;
+    }
+
+    .summary-label {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .conferences-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .conference-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+        transition: border-color 0.2s;
+    }
+
+    .conference-card:hover {
+        border-color: #0f0;
+    }
+
+    .conf-name {
+        color: #0f0;
+        margin: 0 0 0.5rem 0;
+        font-size: 1.2rem;
+    }
+
+    .conf-total {
+        color: #888;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .conf-breakdown {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .breakdown-item {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.4rem 0.6rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #444;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+    }
+
+    .breakdown-item:hover {
+        border-color: #0ff;
+        background: rgba(0, 255, 255, 0.1);
+    }
+
+    .breakdown-item .icon { font-size: 1rem; }
+    .breakdown-item .count { color: #0ff; font-weight: bold; }
+    .breakdown-item .type { color: #888; font-size: 0.8rem; }
+
+    .view-all-link {
+        display: inline-block;
+        color: #0ff;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .view-all-link:hover {
+        text-decoration: underline;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        color: #666;
+    }
+</style>

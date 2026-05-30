@@ -1,0 +1,306 @@
+@page "/files/{id:long}"
+@model defconflix.Pages.Files.DetailsModel
+@{
+    ViewData["Title"] = Model.File?.File_Name ?? "File Details";
+}
+
+<div class="details-container">
+    @if (Model.File != null)
+    {
+        <div class="details-header">
+            <h2>📄 File Details</h2>
+        </div>
+
+        <section class="file-info">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">File Name</span>
+                    <span class="info-value filename">@Model.File.File_Name</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Conference</span>
+                    <span class="info-value">@(Model.File.Conference ?? "Unknown")</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Type</span>
+                    <span class="info-value type-badge">@Model.File.Extension.ToUpper().TrimStart('.')</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Size</span>
+                    <span class="info-value">@Model.GetFileSizeFormatted()</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status</span>
+                    <span class="info-value status-@Model.File.Status?.ToLower().Replace(" ", "-")">@Model.File.Status</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Accessible</span>
+                    <span class="info-value @(Model.File.LastCheckAccessible == true ? "accessible" : "inaccessible")">
+                        @(Model.File.LastCheckAccessible == true ? "Yes" : "No")
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Last Checked</span>
+                    <span class="info-value">@(Model.File.LastCheckedAt?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Added</span>
+                    <span class="info-value">@Model.File.Created_At.ToString("yyyy-MM-dd HH:mm")</span>
+                </div>
+            </div>
+
+            <div class="file-actions">
+                <a href="@Model.File.File_Path" target="_blank" class="btn-primary">
+                    📥 Download Original
+                </a>
+                <a href="/files/search" class="btn-secondary">
+                    🔍 Back to Search
+                </a>
+            </div>
+        </section>
+
+        <section class="translations-section">
+            <h3>🌐 Translations</h3>
+            @if (Model.Translations.Any())
+            {
+                <div class="translations-list">
+                    @foreach (var trans in Model.Translations)
+                    {
+                        <div class="translation-item">
+                            <div class="trans-info">
+                                <span class="trans-lang">@trans.Language</span>
+                                <span class="trans-filename">@trans.FileName</span>
+                            </div>
+                            <div class="trans-meta">
+                                <span>Cues: @trans.CueCount</span>
+                                <span>Created: @trans.CreatedAt.ToString("yyyy-MM-dd")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No translations available yet</p>
+            }
+        </section>
+
+        <section class="history-section">
+            <h3>📊 Status Check History</h3>
+            @if (Model.StatusHistory.Any())
+            {
+                <div class="history-list">
+                    @foreach (var check in Model.StatusHistory)
+                    {
+                        <div class="history-item @(check.IsAccessible ? "check-success" : "check-fail")">
+                            <span class="check-status">@(check.IsAccessible ? "✓" : "✗")</span>
+                            <span class="check-time">@check.CheckedAt.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            @if (!string.IsNullOrEmpty(check.ErrorMessage))
+                            {
+                                <span class="check-error">@check.ErrorMessage</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="no-data">No status checks recorded</p>
+            }
+        </section>
+
+        <section class="raw-path">
+            <h3>🔗 Direct URL</h3>
+            <code class="path-display">@Model.File.File_Path</code>
+        </section>
+    }
+    else
+    {
+        <div class="not-found">
+            <h2>File Not Found</h2>
+            <p>The requested file could not be found.</p>
+            <a href="/files/search">← Back to Search</a>
+        </div>
+    }
+</div>
+
+<style>
+    .details-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .details-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .details-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+    }
+
+    .file-info, .translations-section, .history-section, .raw-path {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .info-label {
+        color: #888;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+    }
+
+    .info-value {
+        color: #fff;
+        font-size: 1rem;
+    }
+
+    .info-value.filename {
+        color: #0ff;
+        word-break: break-all;
+    }
+
+    .type-badge {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #0f0;
+        color: #0f0;
+    }
+
+    .accessible { color: #0f0; }
+    .inaccessible { color: #f00; }
+
+    .file-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 0.75rem 1.5rem;
+        text-decoration: none;
+        border: 1px solid;
+    }
+
+    .btn-primary {
+        background: rgba(0, 255, 0, 0.1);
+        border-color: #0f0;
+        color: #0f0;
+    }
+
+    .btn-secondary {
+        background: rgba(0, 255, 255, 0.1);
+        border-color: #0ff;
+        color: #0ff;
+    }
+
+    .btn-primary:hover, .btn-secondary:hover {
+        filter: brightness(1.2);
+    }
+
+    h3 {
+        color: #0f0;
+        margin-top: 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #333;
+    }
+
+    .translations-list, .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .translation-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .trans-lang {
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .trans-filename {
+        color: #888;
+        font-size: 0.8rem;
+        margin-left: 0.5rem;
+    }
+
+    .trans-meta {
+        color: #888;
+        font-size: 0.8rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    .history-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.5rem;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .check-success { border-left: 3px solid #0f0; }
+    .check-fail { border-left: 3px solid #f00; }
+
+    .check-status {
+        font-size: 1.2rem;
+    }
+
+    .check-success .check-status { color: #0f0; }
+    .check-fail .check-status { color: #f00; }
+
+    .check-time { color: #888; font-size: 0.9rem; }
+    .check-error { color: #f00; font-size: 0.8rem; }
+
+    .path-display {
+        display: block;
+        padding: 1rem;
+        background: #000;
+        color: #0ff;
+        word-break: break-all;
+        font-size: 0.85rem;
+    }
+
+    .no-data {
+        color: #666;
+        font-style: italic;
+    }
+
+    .not-found {
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .not-found h2 { color: #f00; }
+    .not-found a { color: #0ff; }
+
+    .status-completed { border-color: #0f0; color: #0f0; }
+    .status-in-progress { border-color: #ff0; color: #ff0; }
+    .status-not-started { border-color: #888; color: #888; }
+</style>

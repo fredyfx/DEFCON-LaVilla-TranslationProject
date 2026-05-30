@@ -13,12 +13,13 @@
         <header>
             <h1>DEFCON - La Villa Hacker - Translation Project</h1>
             <nav class="main-nav">
+                <a href="/">Home</a>
+                <a href="/files/search">Files</a>
+                <a href="/conferences">Conferences</a>
+                <a href="/translations">My Translations</a>
+                <a href="/stats">Stats</a>
+                <a href="/help">Help</a>
                 <a href="/Profile">Profile</a>
-                <a href="/files/search"> Files </a>
-                @*
-                <a href="/Translation" class="@(ViewContext.RouteData.Values["Page"]?.ToString()?.StartsWith("/Translation") == true ? "active" : "")">
-                    Translation
-                </a> *@
                 <div class="nav-right">
                     <partial name="_LoginPartial" />
                 </div>
