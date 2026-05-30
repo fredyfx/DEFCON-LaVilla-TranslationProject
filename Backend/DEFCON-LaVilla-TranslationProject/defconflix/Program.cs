@@ -43,8 +43,8 @@ builder.Services.AddScoped<ICrawlerCancellationService, CrawlerCancellationServi
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
 builder.Services.AddScoped<IFilesService, FilesService>();
 builder.Services.AddRazorPages();
-// Add Background Services
-builder.Services.AddFileCheckBackgroundService();
+// Add Background Services with configuration
+builder.Services.AddFileCheckBackgroundService(Configuration);
 // Add Custom Exception Handler
 builder.Services.AddExceptionHandler<CustomExceptionHandler>();
 // Adding Endpoints
@@ -70,8 +70,9 @@ if (builder.Environment.IsProduction())
 }
 
 // Middleware
+app.UseCorrelationId(); // Add correlation ID for request tracing
 app.UseRateLimiter();
-// Enhanced API Key and JWT authentication middleware
+// Enhanced API Key and JWT authentication middleware with caching
 app.UseAuthenticationMiddleware();
 app.UseAuthentication();
 app.UseAuthorization();

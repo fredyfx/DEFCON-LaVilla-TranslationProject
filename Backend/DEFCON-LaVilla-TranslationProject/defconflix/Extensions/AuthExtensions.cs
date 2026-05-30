@@ -18,14 +18,27 @@ namespace defconflix.Extensions
         {
             // Add JWT configuration
             var jwtSettings = configuration.GetSection("JWT");
-            var secretKey = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]);
+            var secretKeyValue = jwtSettings["SecretKey"];
+            if (string.IsNullOrWhiteSpace(secretKeyValue))
+            {
+                throw new InvalidOperationException("JWT:SecretKey is not configured. Set it in appsettings or environment variables.");
+            }
+
+            var secretKey = Encoding.ASCII.GetBytes(secretKeyValue);
+            var githubClientId = configuration["GitHub:ClientId"];
+            var githubClientSecret = configuration["GitHub:ClientSecret"];
+            var hasGitHubOAuth =
+                !string.IsNullOrWhiteSpace(githubClientId) &&
+                !string.IsNullOrWhiteSpace(githubClientSecret);
 
             services.Configure<JwtSettings>(jwtSettings);
 
-            services.AddAuthentication(options =>
+            var authenticationBuilder = services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = "GitHub";
+                options.DefaultChallengeScheme = hasGitHubOAuth
+                    ? "GitHub"
+                    : CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.AddScheme(ApiKeyAuthenticationSchemeOptions.DefaultScheme, scheme =>
                 {
@@ -70,161 +83,165 @@ namespace defconflix.Extensions
                     context.Response.Redirect(context.RedirectUri);
                     return Task.CompletedTask;
                 };
-            })
-            .AddOAuth("GitHub", options =>
+            });
+
+            if (hasGitHubOAuth)
             {
-                options.ClientId = configuration["GitHub:ClientId"] ?? throw new InvalidOperationException("GitHub:ClientId not configured");
-                options.ClientSecret = configuration["GitHub:ClientSecret"] ?? throw new InvalidOperationException("GitHub:ClientSecret not configured");
-                options.CallbackPath = "/signin-github";
-                options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.Scope.Add("read:user");
-                options.SaveTokens = true;
-                options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
-                options.TokenEndpoint = "https://github.com/login/oauth/access_token";
-                options.UserInformationEndpoint = "https://api.github.com/user";
-                options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
-                options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
-                options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
-                options.Events = new OAuthEvents
+                authenticationBuilder.AddOAuth("GitHub", options =>
                 {
-                    OnCreatingTicket = async context =>
+                    options.ClientId = githubClientId!;
+                    options.ClientSecret = githubClientSecret!;
+                    options.CallbackPath = "/signin-github";
+                    options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                    options.Scope.Add("read:user");
+                    options.SaveTokens = true;
+                    options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
+                    options.TokenEndpoint = "https://github.com/login/oauth/access_token";
+                    options.UserInformationEndpoint = "https://api.github.com/user";
+                    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+                    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
+                    options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+                    options.Events = new OAuthEvents
                     {
-                        try
+                        OnCreatingTicket = async context =>
                         {
-                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
-                            logger.LogInformation("OnCreatingTicket started for user: {UserId}",
-                                context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-
-                            // Prevent multiple executions by checking if email claim already exists
-                            var existingEmailClaim = context.Principal?.FindFirst(ClaimTypes.Email);
-                            if (existingEmailClaim != null && !string.IsNullOrEmpty(existingEmailClaim.Value))
+                            try
                             {
-                                logger.LogInformation("Email claim already exists, skipping additional API call");
-                                return;
-                            }
+                                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
+                                logger.LogInformation("OnCreatingTicket started for user: {UserId}",
+                                    context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
-                            // Get user information
-                            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-                            request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-                            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
-
-                            var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
-                            response.EnsureSuccessStatusCode();
-                            var responseString = await response.Content.ReadAsStringAsync();
-                            logger.LogInformation("User info response: {Response}", responseString);
-                            var json = JsonDocument.Parse(responseString);
-
-                            // Check if email is public
-                            var emailElement = json.RootElement.GetProperty("email");
-                            string? userEmail = null;
-
-                            if (emailElement.ValueKind != JsonValueKind.Null)
-                            {
-                                userEmail = emailElement.GetString();
-                            }
-
-                            // If email is null, fetch from emails endpoint
-                            if (string.IsNullOrEmpty(userEmail))
-                            {
-                                logger.LogInformation("Public email not found, fetching from emails endpoint");
-
-                                var emailRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
-                                emailRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-                                emailRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
-
-                                var emailResponse = await context.Backchannel.SendAsync(emailRequest, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
-
-                                if (emailResponse.IsSuccessStatusCode)
+                                // Prevent multiple executions by checking if email claim already exists
+                                var existingEmailClaim = context.Principal?.FindFirst(ClaimTypes.Email);
+                                if (existingEmailClaim != null && !string.IsNullOrEmpty(existingEmailClaim.Value))
                                 {
-                                    var emailsJson = JsonDocument.Parse(await emailResponse.Content.ReadAsStringAsync());
+                                    logger.LogInformation("Email claim already exists, skipping additional API call");
+                                    return;
+                                }
 
-                                    // Find primary email or first verified email
-                                    foreach (var emailObj in emailsJson.RootElement.EnumerateArray())
+                                // Get user information
+                                var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+                                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+                                var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+                                response.EnsureSuccessStatusCode();
+                                var responseString = await response.Content.ReadAsStringAsync();
+                                logger.LogInformation("User info response: {Response}", responseString);
+                                var json = JsonDocument.Parse(responseString);
+
+                                // Check if email is public
+                                var emailElement = json.RootElement.GetProperty("email");
+                                string? userEmail = null;
+
+                                if (emailElement.ValueKind != JsonValueKind.Null)
+                                {
+                                    userEmail = emailElement.GetString();
+                                }
+
+                                // If email is null, fetch from emails endpoint
+                                if (string.IsNullOrEmpty(userEmail))
+                                {
+                                    logger.LogInformation("Public email not found, fetching from emails endpoint");
+
+                                    var emailRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
+                                    emailRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                                    emailRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+                                    var emailResponse = await context.Backchannel.SendAsync(emailRequest, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+
+                                    if (emailResponse.IsSuccessStatusCode)
                                     {
-                                        var isPrimary = emailObj.TryGetProperty("primary", out var primaryProp) && primaryProp.GetBoolean();
-                                        var isVerified = emailObj.TryGetProperty("verified", out var verifiedProp) && verifiedProp.GetBoolean();
+                                        var emailsJson = JsonDocument.Parse(await emailResponse.Content.ReadAsStringAsync());
 
-                                        if (isPrimary && isVerified)
-                                        {
-                                            userEmail = emailObj.GetProperty("email").GetString();
-                                            break;
-                                        }
-                                    }
-
-                                    // If no primary email found, use first verified email
-                                    if (string.IsNullOrEmpty(userEmail))
-                                    {
+                                        // Find primary email or first verified email
                                         foreach (var emailObj in emailsJson.RootElement.EnumerateArray())
                                         {
+                                            var isPrimary = emailObj.TryGetProperty("primary", out var primaryProp) && primaryProp.GetBoolean();
                                             var isVerified = emailObj.TryGetProperty("verified", out var verifiedProp) && verifiedProp.GetBoolean();
-                                            if (isVerified)
+
+                                            if (isPrimary && isVerified)
                                             {
                                                 userEmail = emailObj.GetProperty("email").GetString();
                                                 break;
                                             }
                                         }
+
+                                        // If no primary email found, use first verified email
+                                        if (string.IsNullOrEmpty(userEmail))
+                                        {
+                                            foreach (var emailObj in emailsJson.RootElement.EnumerateArray())
+                                            {
+                                                var isVerified = emailObj.TryGetProperty("verified", out var verifiedProp) && verifiedProp.GetBoolean();
+                                                if (isVerified)
+                                                {
+                                                    userEmail = emailObj.GetProperty("email").GetString();
+                                                    break;
+                                                }
+                                            }
+                                        }
                                     }
+                                    else
+                                    {
+                                        logger.LogWarning("Failed to fetch user emails. Status: {StatusCode}", emailResponse.StatusCode);
+                                    }
+                                }
+
+                                // Run claim actions on the main user info
+                                context.RunClaimActions(json.RootElement);
+
+                                // Add email claim if we found one
+                                if (!string.IsNullOrEmpty(userEmail) && context.Principal?.Identity is ClaimsIdentity identity)
+                                {
+                                    // Remove any existing email claim to avoid duplicates
+                                    var existingClaim = identity.FindFirst(ClaimTypes.Email);
+                                    if (existingClaim != null)
+                                    {
+                                        identity.RemoveClaim(existingClaim);
+                                    }
+
+                                    identity.AddClaim(new Claim(ClaimTypes.Email, userEmail));
+                                    logger.LogInformation("Added email claim: {Email}", userEmail);
                                 }
                                 else
                                 {
-                                    logger.LogWarning("Failed to fetch user emails. Status: {StatusCode}", emailResponse.StatusCode);
-                                }
-                            }
-
-                            // Run claim actions on the main user info
-                            context.RunClaimActions(json.RootElement);
-
-                            // Add email claim if we found one
-                            if (!string.IsNullOrEmpty(userEmail) && context.Principal?.Identity is ClaimsIdentity identity)
-                            {
-                                // Remove any existing email claim to avoid duplicates
-                                var existingClaim = identity.FindFirst(ClaimTypes.Email);
-                                if (existingClaim != null)
-                                {
-                                    identity.RemoveClaim(existingClaim);
+                                    logger.LogWarning("No email found for user: {UserId}",
+                                        context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
                                 }
 
-                                identity.AddClaim(new Claim(ClaimTypes.Email, userEmail));
-                                logger.LogInformation("Added email claim: {Email}", userEmail);
+                                logger.LogInformation("OnCreatingTicket completed successfully");
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                logger.LogWarning("No email found for user: {UserId}",
-                                    context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-                            }
+                                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
+                                logger.LogError(ex, "Error in OnCreatingTicket");
 
-                            logger.LogInformation("OnCreatingTicket completed successfully");
-                        }
-                        catch (Exception ex)
+                                // Don't throw, allow authentication to continue with basic info
+                            }
+                        },
+
+                        OnRemoteFailure = context =>
                         {
                             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
-                            logger.LogError(ex, "Error in OnCreatingTicket");
+                            logger.LogError("OAuth remote failure: {Error}", context.Failure?.Message);
 
-                            // Don't throw, allow authentication to continue with basic info
+                            context.Response.Redirect("/");
+                            context.HandleResponse();
+                            return Task.CompletedTask;
+                        },
+
+                        OnAccessDenied = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
+                            logger.LogWarning("OAuth access denied");
+
+                            context.Response.Redirect("/");
+                            context.HandleResponse();
+                            return Task.CompletedTask;
                         }
-                    },
-
-                    OnRemoteFailure = context =>
-                    {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
-                        logger.LogError("OAuth remote failure: {Error}", context.Failure?.Message);
-
-                        context.Response.Redirect("/");
-                        context.HandleResponse();
-                        return Task.CompletedTask;
-                    },
-
-                    OnAccessDenied = context =>
-                    {
-                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<OAuthEvents>>();
-                        logger.LogWarning("OAuth access denied");
-
-                        context.Response.Redirect("/");
-                        context.HandleResponse();
-                        return Task.CompletedTask;
-                    }
-                };
-            });
+                    };
+                });
+            }
 
             // Add Authorization with Admin policy
             services.AddAuthorization(options =>

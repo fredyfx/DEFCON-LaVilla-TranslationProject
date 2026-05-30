@@ -100,7 +100,7 @@ namespace defconflix.Endpoints
                 return Results.Json(new
                 {
                     job.JobId,
-                    job.Status,
+                    Status = job.StatusText,
                     job.StartedAt,
                     job.CompletedAt,
                     job.TotalFiles,
@@ -121,7 +121,7 @@ namespace defconflix.Endpoints
                 var response = activeJobs.Select(job => new
                 {
                     job.JobId,
-                    job.Status,
+                    Status = job.StatusText,
                     job.StartedAt,
                     job.TotalFiles,
                     job.ProcessedFiles,

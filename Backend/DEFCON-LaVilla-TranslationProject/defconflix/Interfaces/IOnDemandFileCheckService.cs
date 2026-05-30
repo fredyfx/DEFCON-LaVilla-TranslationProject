@@ -1,4 +1,4 @@
-﻿using defconflix.Models;
+using defconflix.Models;
 
 namespace defconflix.Interfaces
 {
@@ -9,7 +9,13 @@ namespace defconflix.Interfaces
         Task<string> StartFilesNeedingCheckJobAsync(int? userId = null);
         Task<FileCheckJobStatus?> GetJobStatusAsync(string jobId);
         Task<List<FileCheckJobStatus>> GetActiveJobsAsync();
+        Task<List<FileCheckJobStatus>> GetAllJobsAsync();
         Task<bool> CancelJobAsync(string jobId);
-    }
 
+        /// <summary>
+        /// Removes completed jobs older than the specified retention period.
+        /// Returns the number of jobs cleaned up.
+        /// </summary>
+        Task<int> CleanupCompletedJobsAsync(TimeSpan retentionPeriod);
+    }
 }

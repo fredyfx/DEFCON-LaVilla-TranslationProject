@@ -102,6 +102,7 @@ namespace defconflix.WebAPI.Services
                 }
 
                 var filePath = await _dbContext.Files
+                    .AsNoTracking()
                     .Where(f => f.Id == id)
                     .Select(u => u.File_Path)
                     .SingleOrDefaultAsync();
@@ -134,7 +135,7 @@ namespace defconflix.WebAPI.Services
 
                 var filter = GetFileFilterByType(fileType.ToLower());
 
-                var totalFiles = await _dbContext.Files.CountAsync(filter);
+                var totalFiles = await _dbContext.Files.AsNoTracking().CountAsync(filter);
                 var totalPages = CalculateTotalPages(totalFiles, pageSize);
 
                 var files = await GetPaginatedFilesAsync(filter, page, pageSize);
@@ -177,7 +178,7 @@ namespace defconflix.WebAPI.Services
                 
                 var filter = GetSearchFilter(fileTypeRequested.ToLower(), conference, term);
 
-                var totalFiles = await _dbContext.Files.CountAsync(filter);
+                var totalFiles = await _dbContext.Files.AsNoTracking().CountAsync(filter);
                 var totalPages = CalculateTotalPages(totalFiles, pageSize);
 
                 var files = await GetPaginatedFilesAsync(filter, page, pageSize);
@@ -225,46 +226,54 @@ namespace defconflix.WebAPI.Services
 
         private static Expression<Func<Files, bool>> GetFileFilterByType(string fileType)
         {
+            // Use ILike for case-insensitive comparison (PostgreSQL optimized)
             return fileType switch
             {
-                "all" => f => (f.Extension.ToLower() == ".mp4" || f.Extension.ToLower() == ".pdf" || f.Extension.ToLower() == ".srt" || f.Extension.ToLower() == ".txt") &&
+                "all" => f => (EF.Functions.ILike(f.Extension, ".mp4") || EF.Functions.ILike(f.Extension, ".pdf") ||
+                              EF.Functions.ILike(f.Extension, ".srt") || EF.Functions.ILike(f.Extension, ".txt")) &&
                     f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
-                "mp4" => f => f.Extension.ToLower() == ".mp4" && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
-                "pdf" => f => f.Extension.ToLower() == ".pdf" && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
-                "srt" => f => f.Extension.ToLower() == ".srt" && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
-                "txt" => f => f.Extension.ToLower() == ".txt" && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
+                "mp4" => f => EF.Functions.ILike(f.Extension, ".mp4") && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
+                "pdf" => f => EF.Functions.ILike(f.Extension, ".pdf") && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
+                "srt" => f => EF.Functions.ILike(f.Extension, ".srt") && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
+                "txt" => f => EF.Functions.ILike(f.Extension, ".txt") && f.LastCheckAccessible == true && !string.IsNullOrEmpty(f.Conference),
                 _ => f => true // This should never be reached due to validation
             };
         }
 
         private static Expression<Func<Files, bool>> GetSearchFilter(string fileType, string conference, string searchTerm)
         {
+            // Pre-compute conference check to avoid closure issues
+            var isAllConference = string.IsNullOrEmpty(conference) || conference.Equals("all", StringComparison.OrdinalIgnoreCase);
+            var conferencePattern = $"%{conference}%";
+
+            // Use ILike for all case-insensitive comparisons (PostgreSQL optimized)
             return fileType switch
             {
-                "all" => f => (f.Extension.ToLower() == ".mp4" || f.Extension.ToLower() == ".pdf" || f.Extension.ToLower() == ".srt" || f.Extension.ToLower() == ".txt") &&
+                "all" => f => (EF.Functions.ILike(f.Extension, ".mp4") || EF.Functions.ILike(f.Extension, ".pdf") ||
+                              EF.Functions.ILike(f.Extension, ".srt") || EF.Functions.ILike(f.Extension, ".txt")) &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
-                    (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
+                    (isAllConference || EF.Functions.ILike(f.Conference!, conferencePattern)) &&
                     (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
-                "mp4" => f => f.Extension.ToLower() == ".mp4" &&
+                "mp4" => f => EF.Functions.ILike(f.Extension, ".mp4") &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
-                    (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
+                    (isAllConference || EF.Functions.ILike(f.Conference!, conferencePattern)) &&
                     (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
-                "pdf" => f => f.Extension.ToLower() == ".pdf" &&
+                "pdf" => f => EF.Functions.ILike(f.Extension, ".pdf") &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
-                    (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
+                    (isAllConference || EF.Functions.ILike(f.Conference!, conferencePattern)) &&
                     (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
-                "srt" => f => f.Extension.ToLower() == ".srt" &&
+                "srt" => f => EF.Functions.ILike(f.Extension, ".srt") &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
-                    (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
+                    (isAllConference || EF.Functions.ILike(f.Conference!, conferencePattern)) &&
                     (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
-                "txt" => f => f.Extension.ToLower() == ".txt" &&
+                "txt" => f => EF.Functions.ILike(f.Extension, ".txt") &&
                     f.LastCheckAccessible == true &&
                     !string.IsNullOrEmpty(f.Conference) &&
-                    (string.IsNullOrEmpty(conference) || conference.ToLower() == "all" || f.Conference!.ToLower().Contains(conference.ToLower())) &&
+                    (isAllConference || EF.Functions.ILike(f.Conference!, conferencePattern)) &&
                     (string.IsNullOrEmpty(searchTerm) || EF.Functions.ILike(f.File_Name, $"%{searchTerm}%")),
                 _ => f => true
             };
@@ -345,6 +354,7 @@ namespace defconflix.WebAPI.Services
             int pageSize)
         {
             return await _dbContext.Files
+                .AsNoTracking()
                 .Where(filter)
                 .OrderBy(u => u.Id)
                 .Skip((page - 1) * pageSize)
@@ -368,6 +378,7 @@ namespace defconflix.WebAPI.Services
         private async Task<List<dynamic>> GetFilesByIdsAsync(long[] ids)
         {
             return await _dbContext.Files
+                .AsNoTracking()
                 .Where(f => ids.Contains(f.Id))
                 .Select(f => new { f.Id, f.File_Path })
                 .ToListAsync<dynamic>();

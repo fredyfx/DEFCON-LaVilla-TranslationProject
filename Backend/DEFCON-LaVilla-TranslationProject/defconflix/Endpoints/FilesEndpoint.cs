@@ -1,63 +1,36 @@
-﻿using defconflix.Data;
+using defconflix.Data;
 using defconflix.Interfaces;
-using defconflix.Models;
 using defconflix.WebAPI.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
 using System.Text;
+using FileDTO = defconflix.WebAPI.Interfaces.FileDTO;
 
 namespace defconflix.Endpoints
 {
     public class FilesEndpoint : IEndpoint
     {
         public record BulkDownloadRequest(long[] Ids);
-        public record FileDTO(long Id, string FileName, string conference, string Status);
         public record ConferenceDto(string name);
+
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
 
-            async Task<IResult> GetFilesByType(ApiContext db, string type, int page = 1, int pageSize = 10)
+            async Task<IResult> GetFilesByType(IFilesService filesService, string type, int page = 1, int pageSize = 10)
             {
-                // Validation for type parameter
-                var fileTypeRequested = type.ToLower();
-
-                // type should be either mp4 or pdf or srt or txt:
-                if (fileTypeRequested != "mp4" && fileTypeRequested != "pdf" && fileTypeRequested != "srt" && fileTypeRequested != "txt")
-                {
-                    return Results.BadRequest("Invalid file type requested. Only 'mp4', 'pdf', 'srt' and 'txt' are supported.");
-                }
-
-                // Validate pagination parameters
-                page = Math.Max(1, page);
-                pageSize = Math.Clamp(pageSize, 1, 100); // Max 100 items per page
-
-                Expression<Func<Files, bool>> filter = f =>
-                f.LastCheckAccessible == true &&
-                f.Extension.ToLower() == $".{fileTypeRequested}" &&
-                !string.IsNullOrEmpty(f.Conference);
-
-                var totalFiles = await db.Files.CountAsync(filter);
-                var totalPages = (int)Math.Ceiling((double)totalFiles / pageSize);
-
-                var files = await db.Files
-                    .Where(filter)
-                    .OrderBy(u => u.Id)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
-                    .ToListAsync();
+                // Delegate to service (DRY - no duplicate logic)
+                var result = await filesService.GetFilesByTypeAsync(type, page, pageSize);
 
                 return Results.Json(new
                 {
-                    Files = files,
+                    Files = result.Files,
                     Pagination = new
                     {
-                        CurrentPage = page,
-                        PageSize = pageSize,
-                        TotalPages = totalPages,
-                        TotalFiles = totalFiles,
-                        HasPreviousPage = page > 1,
-                        HasNextPage = page < totalPages
+                        result.Pagination.CurrentPage,
+                        result.Pagination.PageSize,
+                        result.Pagination.TotalPages,
+                        result.Pagination.TotalFiles,
+                        result.Pagination.HasPreviousPage,
+                        result.Pagination.HasNextPage
                     }
                 });
             }
@@ -65,6 +38,7 @@ namespace defconflix.Endpoints
             async Task<IResult> GetFileById(ApiContext db, int id)
             {
                 var file = await db.Files
+                    .AsNoTracking()
                     .Where(f => f.Id == id)
                     .Select(u => u.File_Path)
                     .SingleOrDefaultAsync();
@@ -83,6 +57,7 @@ namespace defconflix.Endpoints
                 }
 
                 var file = await db.Files
+                    .AsNoTracking()
                     .Where(f => f.File_Name == filename)
                     .Select(u => new FileDTO(u.Id, u.File_Name, u.Conference, u.Status))
                     .SingleOrDefaultAsync();
@@ -143,6 +118,7 @@ namespace defconflix.Endpoints
                 {
                     // Get all files matching the provided Ids
                     var files = await db.Files
+                        .AsNoTracking()
                         .Where(f => request.Ids.Contains(f.Id))
                         .Select(f => new { f.Id, f.File_Path })
                         .ToListAsync();
@@ -192,9 +168,15 @@ namespace defconflix.Endpoints
                     return Results.BadRequest("No Id provided.");
                 }
 
-                var idsArray = ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                     .Select(h => long.Parse(h.Trim()))
-                                     .ToArray();
+                var parsedIds = new List<long>();
+                foreach (var idStr in ids.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (long.TryParse(idStr.Trim(), out var parsedId))
+                    {
+                        parsedIds.Add(parsedId);
+                    }
+                }
+                var idsArray = parsedIds.ToArray();
 
                 if (idsArray.Length == 0)
                 {
@@ -210,6 +192,7 @@ namespace defconflix.Endpoints
                 {
                     // Get all files matching the provided Ids
                     var files = await db.Files
+                        .AsNoTracking()
                         .Where(f => idsArray.Contains(f.Id) && f.LastCheckAccessible == true)
                         .Select(f => new { f.Id, f.File_Path })
                         .ToListAsync();
@@ -264,15 +247,15 @@ namespace defconflix.Endpoints
                 .RequireAuthorization("ApiAccess");
 
             // api/files/mp4/conference/all/search/Launching Shells?page=1&pagesize=20
-            app.MapGet("/api/files/{fileTypeRequested}/conference/{conference}/search/{term}", GetSearchFilesByTypeConferenceAndTerm);
-            //.RequireAuthorization("ApiAccess");
+            app.MapGet("/api/files/{fileTypeRequested}/conference/{conference}/search/{term}", GetSearchFilesByTypeConferenceAndTerm)
+                .RequireAuthorization("ApiAccess");
 
             // api/files/download?ids=1,2,3,4...
-            app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload);
-            //.RequireAuthorization("ApiAccess");
+            app.MapGet("/api/files/download", GetSmallFilesLocationsToDownload)
+                .RequireAuthorization("ApiAccess");
 
-            app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload);
-                //.RequireAuthorization("ApiAccess");
+            app.MapPost("/api/files/download", GetLargeFilesLocationsToDownload)
+                .RequireAuthorization("ApiAccess");
         }
     }
 }

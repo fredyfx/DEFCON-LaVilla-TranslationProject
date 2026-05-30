@@ -1,8 +1,9 @@
-﻿using defconflix.Data;
+using defconflix.Data;
 using defconflix.Extensions;
 using defconflix.Interfaces;
 using defconflix.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Text.RegularExpressions;
 
@@ -15,19 +16,25 @@ namespace defconflix.Services
         private readonly ILogger<WebCrawlerService> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ICrawlerCancellationService _cancellationService;
+        private readonly IBackgroundTaskQueue _taskQueue;
+        private readonly BackgroundJobOptions _options;
 
         public WebCrawlerService(
             ApiContext context,
             IHttpClientFactory httpClientFactory,
             ILogger<WebCrawlerService> logger,
             IServiceScopeFactory scopeFactory,
-            ICrawlerCancellationService cancellationService)
+            ICrawlerCancellationService cancellationService,
+            IBackgroundTaskQueue taskQueue,
+            IOptions<BackgroundJobOptions> options)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _scopeFactory = scopeFactory;
             _cancellationService = cancellationService;
+            _taskQueue = taskQueue;
+            _options = options.Value;
         }
 
         public async Task<List<CrawlerJob>> GetAllJobsAsync()
@@ -47,7 +54,7 @@ namespace defconflix.Services
             var job = new CrawlerJob
             {
                 StartUrl = baseUrl,
-                Status = "Running",
+                StatusEnum = JobStatus.Queued,
                 StartTime = DateTime.UtcNow,
                 StartedByUserId = userId,
             };
@@ -55,20 +62,28 @@ namespace defconflix.Services
             _context.CrawlerJobs.Add(job);
             await _context.SaveChangesAsync();
 
-            // Start background crawling
-            _ = Task.Run(() => CrawlAsync(job.Id, baseUrl));
+            var jobId = job.Id;
 
-            return job.Id;
+            // Queue the crawl job instead of fire-and-forget Task.Run
+            // This provides backpressure and controlled concurrency
+            await _taskQueue.QueueBackgroundWorkItemAsync(async token =>
+            {
+                await CrawlAsync(jobId, baseUrl, token);
+            });
+
+            _logger.LogInformation("Queued crawler job {JobId} for URL: {Url}", jobId, baseUrl);
+
+            return jobId;
         }
 
-        private async Task CrawlAsync(int jobId, string baseUrl)
+        private async Task CrawlAsync(int jobId, string baseUrl, CancellationToken stoppingToken)
         {
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApiContext>();
             var cancellationService = scope.ServiceProvider.GetRequiredService<ICrawlerCancellationService>();
             var httpClient = _httpClientFactory.CreateClient();
 
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            httpClient.Timeout = _options.HttpTimeout;
             httpClient.DefaultRequestHeaders.Add("User-Agent",
                 "DefconFlix-Crawler/1.0 (La Villa Hacker)");
 
@@ -80,19 +95,32 @@ namespace defconflix.Services
             job.FilesSuccessful = 0;
             job.FilesWithErrors = 0;
             job.FilesProcessed = 0;
+            job.StatusEnum = JobStatus.Running;
+            await context.SaveChangesAsync();
 
             try
             {
                 var visitedUrls = new HashSet<string>();
                 var urlsToVisit = new Queue<string>();
                 urlsToVisit.Enqueue(baseUrl);
-                int filesFound = 0;
+
                 while (urlsToVisit.Count > 0)
                 {
-                    // Check for cancellation request at the start of each iteration
+                    // Check for global cancellation (app shutdown)
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("Crawler job {JobId} stopping due to application shutdown", jobId);
+                        job.StatusEnum = JobStatus.Cancelled;
+                        job.ErrorMessage = "Application shutdown";
+                        job.EndTime = DateTime.UtcNow;
+                        await context.SaveChangesAsync();
+                        return;
+                    }
+
+                    // Check for user-requested cancellation
                     if (await cancellationService.IsCancellationRequestedAsync(jobId))
                     {
-                        _logger.LogInformation($"Cancellation detected for job {jobId}. Stopping crawl gracefully.");
+                        _logger.LogInformation("Cancellation detected for job {JobId}. Stopping crawl gracefully.", jobId);
                         await cancellationService.MarkJobAsCancelledAsync(jobId);
                         return;
                     }
@@ -103,7 +131,7 @@ namespace defconflix.Services
                         continue;
 
                     visitedUrls.Add(currentUrl);
-                    _logger.LogInformation($"Crawling: {currentUrl}");
+                    _logger.LogInformation("Crawling: {Url}", currentUrl);
 
                     try
                     {
@@ -116,11 +144,11 @@ namespace defconflix.Services
 
                         // For directories, only get the HTML listing
                         using var request = new HttpRequestMessage(HttpMethod.Get, currentUrl);
-                        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stoppingToken);
 
                         if (!response.IsSuccessStatusCode)
                         {
-                            _logger.LogWarning($"Failed to fetch {currentUrl}: {response.StatusCode}");
+                            _logger.LogWarning("Failed to fetch {Url}: {StatusCode}", currentUrl, response.StatusCode);
                             continue;
                         }
 
@@ -128,14 +156,14 @@ namespace defconflix.Services
                         var contentType = response.Content.Headers.ContentType?.MediaType?.ToLower();
                         if (contentType == null || !contentType.Contains("text/html"))
                         {
-                            _logger.LogInformation($"Skipping non-HTML content: {currentUrl}");
+                            _logger.LogInformation("Skipping non-HTML content: {Url}", currentUrl);
                             continue;
                         }
 
                         // Read only a reasonable amount for directory listings
-                        using var stream = await response.Content.ReadAsStreamAsync();
-                        using var reader = new System.IO.StreamReader(stream);
-                        var content = await reader.ReadToEndAsync();
+                        using var stream = await response.Content.ReadAsStreamAsync(stoppingToken);
+                        using var reader = new StreamReader(stream);
+                        var content = await reader.ReadToEndAsync(stoppingToken);
 
                         var links = ExtractLinks(content, currentUrl);
 
@@ -148,7 +176,6 @@ namespace defconflix.Services
                             {
                                 visitedUrls.Add(link);
                                 await ProcessFileAsync(context, httpClient, link, job);
-                                filesFound++;
                             }
                             else if (IsDirectoryLink(link, baseUrl))
                             {
@@ -162,68 +189,59 @@ namespace defconflix.Services
                             // Check cancellation again before database update
                             if (await cancellationService.IsCancellationRequestedAsync(jobId))
                             {
-                                _logger.LogInformation($"Cancellation detected during progress update for job {jobId}");
+                                _logger.LogInformation("Cancellation detected during progress update for job {JobId}", jobId);
                                 await cancellationService.MarkJobAsCancelledAsync(jobId);
                                 return;
                             }
 
-                            // Update job progress with detailed statistics in database
-                            var currentJob = await context.CrawlerJobs.FindAsync(jobId);
-                            if (currentJob != null)
-                            {
-                                // Sync the in-memory counters with database
-                                currentJob.FilesFound = job.FilesFound;
-                                currentJob.FilesSuccessful = job.FilesSuccessful;
-                                currentJob.FilesWithErrors = job.FilesWithErrors;
-                                currentJob.FilesProcessed = job.FilesProcessed;
-                                await context.SaveChangesAsync();
+                            // Sync progress to database
+                            await context.SaveChangesAsync();
 
-                                _logger.LogInformation($"Progress Update - Job {jobId}: Found={job.FilesFound}, " +
-                                    $"Successful={job.FilesSuccessful}, Errors={job.FilesWithErrors}, " +
-                                    $"Success Rate={job.SuccessRate:F1}%");
-                            }
+                            _logger.LogInformation("Progress Update - Job {JobId}: Found={Found}, Successful={Successful}, Errors={Errors}, Success Rate={Rate:F1}%",
+                                jobId, job.FilesFound, job.FilesSuccessful, job.FilesWithErrors, job.SuccessRate);
                         }
 
-                        // Add delay to be respectful to the server
-                        await Task.Delay(500);
+                        // Configurable delay to be respectful to the server
+                        await Task.Delay(_options.CrawlerRequestDelay, stoppingToken);
                     }
                     catch (HttpRequestException ex)
                     {
-                        _logger.LogError($"HTTP error crawling {currentUrl}: {ex.Message}");
+                        _logger.LogError("HTTP error crawling {Url}: {Message}", currentUrl, ex.Message);
                     }
-                    catch (TaskCanceledException ex)
+                    catch (TaskCanceledException ex) when (!stoppingToken.IsCancellationRequested)
                     {
-                        _logger.LogError($"Timeout crawling {currentUrl}: {ex.Message}");
+                        _logger.LogError("Timeout crawling {Url}: {Message}", currentUrl, ex.Message);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        throw; // Re-throw to be caught by outer handler
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Error crawling {currentUrl}: {ex.Message}");
+                        _logger.LogError("Error crawling {Url}: {Message}", currentUrl, ex.Message);
                     }
                 }
 
-                job.Status = "Completed";
+                job.StatusEnum = JobStatus.Completed;
                 job.EndTime = DateTime.UtcNow;
-                job.FilesFound = filesFound;
-                job.FilesProcessed = job.FilesFound;                
-                job.FilesSuccessful = job.FilesSuccessful;
-                job.FilesWithErrors = job.FilesWithErrors;
-                job.FilesProcessed = job.FilesProcessed;
                 await context.SaveChangesAsync();
 
-                _logger.LogInformation($"Crawling completed for job {jobId}. " +
-                    $"Total Found: {job.FilesFound}, Successful: {job.FilesSuccessful}, " +
-                    $"Errors: {job.FilesWithErrors}, Success Rate: {job.SuccessRate:F1}%");
-                }
+                _logger.LogInformation("Crawling completed for job {JobId}. Total Found: {Found}, Successful: {Successful}, Errors: {Errors}, Success Rate: {Rate:F1}%",
+                    jobId, job.FilesFound, job.FilesSuccessful, job.FilesWithErrors, job.SuccessRate);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Crawler job {JobId} was cancelled", jobId);
+                job.StatusEnum = JobStatus.Cancelled;
+                job.EndTime = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+            }
             catch (Exception ex)
             {
-                _logger.LogError($"Crawling failed: {ex.Message}");
-                job.Status = "Failed";
+                _logger.LogError("Crawling failed for job {JobId}: {Message}", jobId, ex.Message);
+                job.StatusEnum = JobStatus.Failed;
                 job.ErrorMessage = ex.Message;
-                job.EndTime = DateTime.UtcNow;                
-                job.FilesProcessed = job.FilesFound;
-                job.FilesSuccessful = job.FilesSuccessful;
-                job.FilesWithErrors = job.FilesWithErrors;
-                job.FilesProcessed = job.FilesProcessed;
+                job.EndTime = DateTime.UtcNow;
                 await context.SaveChangesAsync();
             }
         }
@@ -234,7 +252,7 @@ namespace defconflix.Services
 
             try
             {
-                _logger.LogDebug($"Processing file URL: {fileUrl}");
+                _logger.LogDebug("Processing file URL: {Url}", fileUrl);
 
                 var uri = new Uri(fileUrl);
                 var rawFileName = Path.GetFileName(uri.LocalPath);
@@ -253,7 +271,7 @@ namespace defconflix.Services
 
                 if (hasProblems)
                 {
-                    _logger.LogWarning($"File has problematic characters but attempting to process: {fileName}");
+                    _logger.LogWarning("File has problematic characters but attempting to process: {FileName}", fileName);
                 }
 
                 // Sanitize the file URL
@@ -268,7 +286,7 @@ namespace defconflix.Services
 
                 if (existingFile != null)
                 {
-                    _logger.LogDebug($"File already cataloged: {fileName}");
+                    _logger.LogDebug("File already cataloged: {FileName}", fileName);
                     return;
                 }
 
@@ -289,14 +307,14 @@ namespace defconflix.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning($"Could not verify file {fileUrl}: {ex.Message}");
+                    _logger.LogWarning("Could not verify file {Url}: {Message}", fileUrl, ex.Message);
                     // Still catalog the file even if HEAD request fails
                     fileExists = true;
                 }
 
                 if (!fileExists)
                 {
-                    _logger.LogWarning($"File not accessible: {fileUrl}");
+                    _logger.LogWarning("File not accessible: {Url}", fileUrl);
                     return;
                 }
 
@@ -327,11 +345,11 @@ namespace defconflix.Services
                     wasSuccessful = true;
 
                     var sizeFormatted = fileSize > 0 ? $"{fileSize / (1024.0 * 1024.0):F2} MB" : "unknown size";
-                    _logger.LogInformation($"Cataloged: {fileName} ({extension}) - {sizeFormatted}");
+                    _logger.LogInformation("Cataloged: {FileName} ({Extension}) - {Size}", fileName, extension, sizeFormatted);
                 }
                 catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "22021")
                 {
-                    _logger.LogError($"PostgreSQL encoding error for file: {sanitizedFileName}");
+                    _logger.LogError("PostgreSQL encoding error for file: {FileName}", sanitizedFileName);
 
                     // Record the problematic URI with full details
                     await RecordProblematicUri(context, fileUrl, fileName, extension,
@@ -344,7 +362,7 @@ namespace defconflix.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"Unexpected error saving file {sanitizedFileName}: {ex}");
+                    _logger.LogError("Unexpected error saving file {FileName}: {Error}", sanitizedFileName, ex);
 
                     await RecordProblematicUri(context, fileUrl, fileName, extension,
                         "DATABASE_SAVE_ERROR",
@@ -356,7 +374,7 @@ namespace defconflix.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error cataloging file {fileUrl}: {ex.Message}");
+                _logger.LogError("Error cataloging file {Url}: {Message}", fileUrl, ex.Message);
                 await RecordProblematicUri(context, fileUrl, "UNKNOWN", "UNKNOWN",
                     "PROCESSING_ERROR",
                     $"Error during file processing: {ex.Message}",
@@ -364,8 +382,8 @@ namespace defconflix.Services
             }
             finally
             {
-                // Update counters regardless of success/failure
-                lock (job) // Thread-safe counter updates
+                // Update counters - thread-safe
+                lock (job)
                 {
                     job.FilesFound++;
                     if (wasSuccessful)
@@ -408,7 +426,7 @@ namespace defconflix.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug($"Skipping invalid URL: {href} - {ex.Message}");
+                    _logger.LogDebug("Skipping invalid URL: {Href} - {Message}", href, ex.Message);
                 }
             }
 
@@ -539,11 +557,12 @@ namespace defconflix.Services
                 context.ProblematicUris.Add(problematicUri);
                 await context.SaveChangesAsync();
 
-                _logger.LogWarning($"Recorded problematic URI: {errorType} - {sanitizedFileName} (ID: {problematicUri.Id})");
+                _logger.LogWarning("Recorded problematic URI: {ErrorType} - {FileName} (ID: {Id})",
+                    errorType, sanitizedFileName, problematicUri.Id);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to record problematic URI: {originalUri}. Error: {ex.Message}");
+                _logger.LogError("Failed to record problematic URI: {Uri}. Error: {Message}", originalUri, ex.Message);
             }
         }
     }

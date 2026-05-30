@@ -1,6 +1,7 @@
 ﻿using defconflix.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OAuth;
 
 namespace defconflix.Endpoints
 {
@@ -8,7 +9,7 @@ namespace defconflix.Endpoints
     {
         public void MapEndpoint(IEndpointRouteBuilder app)
         {
-            app.MapGet("/login", async (HttpContext context, string? error = null) =>
+            app.MapGet("/login", async (HttpContext context, IAuthenticationSchemeProvider schemeProvider, string? error = null) =>
             {
                 // If user is already authenticated but there was an error, force logout first
                 if (context.User.Identity.IsAuthenticated && !string.IsNullOrEmpty(error))
@@ -38,6 +39,14 @@ namespace defconflix.Endpoints
                     };
 
                     return Results.Text($"Login Error: {errorMessage}\n\nClick here to try again: <a href='/login'>Login with GitHub</a>", "text/html");
+                }
+
+                var githubScheme = await schemeProvider.GetSchemeAsync("GitHub");
+                if (githubScheme == null)
+                {
+                    return Results.Text(
+                        "Login is not available because GitHub OAuth is not configured. Set GitHub:ClientId and GitHub:ClientSecret in configuration.",
+                        "text/plain");
                 }
 
                 await context.ChallengeAsync("GitHub", new AuthenticationProperties

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace defconflix.Models
@@ -8,7 +8,13 @@ namespace defconflix.Models
         [Key]
         public int Id { get; set; }
         public string StartUrl { get; set; } = string.Empty;
-        public string Status { get; set; } = "Not Started"; // Not Started, Running, Completed, Failed
+
+        /// <summary>
+        /// Job status stored as string for backward compatibility with existing data.
+        /// Use StatusEnum property for type-safe access.
+        /// </summary>
+        public string Status { get; set; } = "Pending";
+
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public int FilesFound { get; set; } = 0;
@@ -16,7 +22,7 @@ namespace defconflix.Models
         public int FilesSuccessful { get; set; } = 0;
         public int FilesWithErrors { get; set; } = 0;
         public string? ErrorMessage { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;        
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public TimeSpan? Duration => EndTime.HasValue ? EndTime.Value - StartTime : DateTime.UtcNow - StartTime;
 
         // User tracking
@@ -36,14 +42,36 @@ namespace defconflix.Models
 
         public string? CancellationReason { get; set; }
 
+        /// <summary>
+        /// Type-safe access to job status. Maps string Status to/from JobStatus enum.
+        /// </summary>
         [NotMapped]
-        public bool CanBeCancelled => Status == "Running" || Status == "Not Started";
+        public JobStatus StatusEnum
+        {
+            get => Status switch
+            {
+                "Not Started" or "Pending" => JobStatus.Pending,
+                "Queued" => JobStatus.Queued,
+                "Running" => JobStatus.Running,
+                "Completed" => JobStatus.Completed,
+                "Failed" => JobStatus.Failed,
+                "Cancelled" => JobStatus.Cancelled,
+                _ => JobStatus.Pending
+            };
+            set => Status = value.ToString();
+        }
 
         [NotMapped]
-        public bool IsCancelled => Status == "Cancelled";
+        public bool CanBeCancelled => StatusEnum.CanBeCancelled();
 
         [NotMapped]
-        public bool IsActive => Status == "Running" || Status == "Not Started";
+        public bool IsCancelled => StatusEnum == JobStatus.Cancelled;
+
+        [NotMapped]
+        public bool IsActive => StatusEnum.IsActive();
+
+        [NotMapped]
+        public bool IsTerminal => StatusEnum.IsTerminal();
 
         [NotMapped]
         public double SuccessRate => FilesFound > 0 ? (double)FilesSuccessful / FilesFound * 100 : 0;
