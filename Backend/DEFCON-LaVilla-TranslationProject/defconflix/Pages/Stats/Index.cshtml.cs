@@ -26,26 +26,32 @@ namespace defconflix.Pages.Stats
 
         public async Task OnGetAsync()
         {
-            var filesQuery = _context.Files
+            // Batch file counts into single query
+            var fileCounts = await _context.Files
                 .AsNoTracking()
-                .Where(f => f.LastCheckAccessible == true);
+                .Where(f => f.LastCheckAccessible == true)
+                .GroupBy(f => 1)
+                .Select(g => new
+                {
+                    Total = g.Count(),
+                    Videos = g.Count(f => EF.Functions.ILike(f.Extension, ".mp4")),
+                    Pdfs = g.Count(f => EF.Functions.ILike(f.Extension, ".pdf")),
+                    Subtitles = g.Count(f => EF.Functions.ILike(f.Extension, ".srt")
+                                          || EF.Functions.ILike(f.Extension, ".vtt")),
+                    Completed = g.Count(f => EF.Functions.ILike(f.Status, "Completed")),
+                    InProgress = g.Count(f => EF.Functions.ILike(f.Status, "In Progress"))
+                })
+                .FirstOrDefaultAsync();
 
-            TotalFiles = await filesQuery.CountAsync();
-            TotalVideos = await filesQuery.CountAsync(f => EF.Functions.ILike(f.Extension, ".mp4"));
-            TotalPdfs = await filesQuery.CountAsync(f => EF.Functions.ILike(f.Extension, ".pdf"));
-            TotalSubtitles = await filesQuery.CountAsync(f =>
-                EF.Functions.ILike(f.Extension, ".srt") || EF.Functions.ILike(f.Extension, ".vtt"));
+            TotalFiles = fileCounts?.Total ?? 0;
+            TotalVideos = fileCounts?.Videos ?? 0;
+            TotalPdfs = fileCounts?.Pdfs ?? 0;
+            TotalSubtitles = fileCounts?.Subtitles ?? 0;
+            CompletedFiles = fileCounts?.Completed ?? 0;
+            InProgressFiles = fileCounts?.InProgress ?? 0;
 
             TotalConferences = await _context.Conferences.AsNoTracking().CountAsync();
-
-            // File translation status
             TotalTranslations = await _context.VttFiles.AsNoTracking().CountAsync();
-            CompletedFiles = await _context.Files
-                .AsNoTracking()
-                .CountAsync(f => EF.Functions.ILike(f.Status, "Completed"));
-            InProgressFiles = await _context.Files
-                .AsNoTracking()
-                .CountAsync(f => EF.Functions.ILike(f.Status, "In Progress"));
 
             // Top contributors (by files processed)
             TopContributors = await _context.Files
@@ -62,6 +68,22 @@ namespace defconflix.Pages.Stats
                 .Take(10)
                 .ToListAsync();
 
+            // Conference progress - single query with GROUP BY (fixes N+1)
+            ConferenceProgressList = await _context.Files
+                .AsNoTracking()
+                .Where(f => f.LastCheckAccessible == true)
+                .GroupBy(f => f.Conference)
+                .Select(g => new ConferenceProgressItem
+                {
+                    Name = g.Key,
+                    TotalFiles = g.Count(),
+                    CompletedFiles = g.Count(f => EF.Functions.ILike(f.Status, "Completed"))
+                })
+                .Where(c => c.TotalFiles > 0)
+                .OrderByDescending(c => c.TotalFiles)
+                .Take(15)
+                .ToListAsync();
+
             // Get user names for contributors
             var userIds = TopContributors.Select(c => c.UserId).ToList();
             var users = await _context.Users
@@ -74,27 +96,14 @@ namespace defconflix.Pages.Stats
                 contributor.Name = users.GetValueOrDefault(contributor.UserId, "Unknown");
             }
 
-            TotalContributors = await _context.Files
-                .AsNoTracking()
-                .Where(f => f.ProcessedBy.HasValue)
-                .Select(f => f.ProcessedBy)
-                .Distinct()
-                .CountAsync();
-
-            // Conference progress
-            ConferenceProgressList = await _context.Conferences
-                .AsNoTracking()
-                .Select(c => new ConferenceProgressItem
-                {
-                    Name = c.Name,
-                    TotalFiles = _context.Files.Count(f => f.Conference == c.Name && f.LastCheckAccessible == true),
-                    CompletedFiles = _context.Files
-                        .Count(f => f.Conference == c.Name && EF.Functions.ILike(f.Status, "Completed"))
-                })
-                .Where(c => c.TotalFiles > 0)
-                .OrderByDescending(c => c.TotalFiles)
-                .Take(15)
-                .ToListAsync();
+            TotalContributors = TopContributors.Count > 0
+                ? await _context.Files
+                    .AsNoTracking()
+                    .Where(f => f.ProcessedBy.HasValue)
+                    .Select(f => f.ProcessedBy)
+                    .Distinct()
+                    .CountAsync()
+                : 0;
         }
 
         public class TopContributor
