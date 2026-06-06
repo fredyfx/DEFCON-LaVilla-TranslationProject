@@ -313,10 +313,11 @@ def install_basic_packages(pip_path: str) -> bool:
         'ffmpeg-python',
         'openai',
         'psycopg2-binary',
+        'markitdown',
     ]
 
     cmd = [pip_path, 'install', '--upgrade'] + packages
-    return run_command(cmd, "Installing basic packages (requests, ffmpeg-python, openai, psycopg2)")
+    return run_command(cmd, "Installing basic packages (requests, ffmpeg-python, openai, psycopg2, markitdown)")
 
 
 def install_pytorch(pip_path: str) -> bool:
@@ -545,7 +546,7 @@ def print_system_install_instructions(os_info: OSInfo):
 
 def create_directories():
     """Create required directories."""
-    dirs = ['downloads', 'audio', 'vtt']
+    dirs = ['downloads', 'audio', 'vtt', 'pdf_extracts']
 
     print(f"\n{CYAN}Creating directories...{RESET}")
     for d in dirs:
