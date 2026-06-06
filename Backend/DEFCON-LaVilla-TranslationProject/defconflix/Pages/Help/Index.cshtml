@@ -40,6 +40,10 @@
                 <li><strong>Conference:</strong> Filter by specific DEFCON year or event</li>
                 <li><strong>Search Term:</strong> Search by filename or keywords</li>
             </ul>
+            <p style="margin-top: 1rem;">
+                <strong>Content Search:</strong> Use <code>/api/summary/search?q=your+query</code> to search
+                inside video transcripts and document summaries using full-text search. Results are ranked by relevance.
+            </p>
         </div>
     </section>
 
@@ -93,20 +97,38 @@
             <h4>Common Endpoints</h4>
             <div class="endpoint-list">
                 <div class="endpoint">
-                    <code>GET /api/files/search</code>
-                    <span>Search for files</span>
+                    <code>GET /api/files/{type}</code>
+                    <span>List files by type (mp4, pdf, txt, srt)</span>
                 </div>
                 <div class="endpoint">
                     <code>GET /api/files/download?ids=1,2,3</code>
                     <span>Download file URLs</span>
                 </div>
                 <div class="endpoint">
-                    <code>POST /api/translations</code>
-                    <span>Submit a translation</span>
+                    <code>POST /api/translation/start</code>
+                    <span>Start a translation job</span>
                 </div>
                 <div class="endpoint">
-                    <code>GET /api/translations/my</code>
-                    <span>List your translations</span>
+                    <code>GET /api/translation/{vttFileId}</code>
+                    <span>Get translations for a file</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <h4>Summary & Search Endpoints</h4>
+            <div class="endpoint-list">
+                <div class="endpoint">
+                    <code>GET /api/summary/search?q=query</code>
+                    <span>Full-text search across summaries and keywords</span>
+                </div>
+                <div class="endpoint">
+                    <code>GET /api/summary/{fileId}</code>
+                    <span>Get summary for a specific file</span>
+                </div>
+                <div class="endpoint">
+                    <code>POST /api/summary</code>
+                    <span>Create or update summary</span>
                 </div>
             </div>
         </div>

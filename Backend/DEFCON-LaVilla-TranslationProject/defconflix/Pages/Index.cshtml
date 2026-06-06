@@ -72,35 +72,40 @@
                 <span class="description">Develop the API</span>
                 <span class="status badge-completed">Completed (seems stable)</span>
             </div>
-            <div class="roadmap-item in-progress">
+            <div class="roadmap-item completed">
                 <span class="phase">Phase 2</span>
                 <span class="description">Develop the Client for processing mp4 files</span>
-                <span class="status badge-progress">In Progress</span>
+                <span class="status badge-completed">Completed</span>
             </div>
-            <div class="roadmap-item queued">
+            <div class="roadmap-item completed">
                 <span class="phase">Phase 3</span>
                 <span class="description">Develop the Client for VTT Files translation</span>
-                <span class="status badge-queued">On Queue</span>
+                <span class="status badge-completed">Completed</span>
             </div>
-            <div class="roadmap-item queued">
+            <div class="roadmap-item completed">
                 <span class="phase">Phase 4</span>
-                <span class="description">Develop the Client for processing PDF Files to markdown and translate them</span>
-                <span class="status badge-queued">On Queue</span>
+                <span class="description">Develop the Client for processing PDF Files to markdown</span>
+                <span class="status badge-completed">Completed</span>
             </div>
-            <div class="roadmap-item queued">
+            <div class="roadmap-item completed">
                 <span class="phase">Phase 5</span>
-                <span class="description">Develop the Summarization Engine for text files (VTT and PDFs in markdown)</span>
-                <span class="status badge-queued">On Queue</span>
+                <span class="description">Develop the Summarization Engine for text files (VTT and PDFs)</span>
+                <span class="status badge-completed">Completed</span>
             </div>
-            <div class="roadmap-item queued help-needed">
+            <div class="roadmap-item completed">
                 <span class="phase">Phase 6</span>
-                <span class="description">Develop the Search Engine with Vectorized Embeddings</span>
-                <span class="status badge-queued">On Queue</span>
-                <span class="help-badge">Help Required</span>
+                <span class="description">Develop Full-Text Search Engine</span>
+                <span class="status badge-completed">Completed</span>
             </div>
             <div class="roadmap-item queued help-needed">
                 <span class="phase">Phase 7</span>
-                <span class="description">Integrate with LLMs</span>
+                <span class="description">Add Vector Embeddings for Semantic Search</span>
+                <span class="status badge-queued">On Queue</span>
+                <span class="help-badge">Future Enhancement</span>
+            </div>
+            <div class="roadmap-item queued help-needed">
+                <span class="phase">Phase 8</span>
+                <span class="description">Integrate with LLMs for Q&A</span>
                 <span class="status badge-queued">On Queue</span>
                 <span class="help-badge">Help Required</span>
             </div>
@@ -231,6 +236,65 @@
                 <span class="method get">GET</span>
                 <code>/api/users</code>
                 <span class="description">List all users with pagination</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>🌍 Translation Endpoints</h3>
+        <p class="section-description">Require X-API-Key header</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/translation/start</code>
+                <span class="description">Start translation for a VTT file</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/translation/cue</code>
+                <span class="description">Submit translated cue</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/translation/completed/{id}</code>
+                <span class="description">Mark translation as complete</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/translation/{vttFileId}</code>
+                <span class="description">Get translations for a VTT file</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/translation/export/{id}</code>
+                <span class="description">Export translation as VTT file</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="home-section">
+        <h3>📝 Summary & Search Endpoints</h3>
+        <p class="section-description">Require X-API-Key header - Full-Text Search on summaries and keywords</p>
+        <div class="endpoints-list">
+            <div class="endpoint-item">
+                <span class="method post">POST</span>
+                <code>/api/summary</code>
+                <span class="description">Create or update summary for a file</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/summary/{fileId}</code>
+                <span class="description">Get summary for a file</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method get">GET</span>
+                <code>/api/summary/search?q=hacking+wifi&limit=20</code>
+                <span class="description">Full-text search across summaries and keywords</span>
+            </div>
+            <div class="endpoint-item">
+                <span class="method delete">DELETE</span>
+                <code>/api/summary/{fileId}</code>
+                <span class="description">Delete summary for a file</span>
             </div>
         </div>
     </section>
@@ -522,6 +586,11 @@
     .endpoint-item .method.post {
         border-color: #ff0;
         color: #ff0;
+    }
+
+    .endpoint-item .method.delete {
+        border-color: #f55;
+        color: #f55;
     }
 
     .endpoint-item code {
