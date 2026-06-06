@@ -9,9 +9,39 @@ public class SummaryEndpoint : IEndpoint
 {
     public record SummaryRequest(long FileId, string ShortSummary, List<string>? KeyTopics, List<string>? Keywords, string? FullSummary, string? GeneratedBy);
     public record SummaryResponse(long Id, long FileId, string ShortSummary, List<string> KeyTopics, List<string> Keywords, string? FullSummary, string GeneratedBy, DateTime CreatedAt);
+    public record SearchResultDto(long FileId, string FileName, string? Conference, string ShortSummary, List<string> Keywords, float Rank);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
+        // GET /api/summary/search?q=hacking+wifi&limit=20
+        app.MapGet("/api/summary/search", async (ApiContext db, string q, int limit = 20) =>
+        {
+            if (string.IsNullOrWhiteSpace(q))
+                return Results.BadRequest("Query parameter 'q' is required");
+
+            limit = Math.Clamp(limit, 1, 100);
+
+            // Convert query to tsquery (websearch format handles phrases and operators)
+            var results = await db.Summaries
+                .Include(s => s.File)
+                .Where(s => s.SearchVector!.Matches(EF.Functions.WebSearchToTsQuery("english", q)))
+                .OrderByDescending(s => s.SearchVector!.Rank(EF.Functions.WebSearchToTsQuery("english", q)))
+                .Take(limit)
+                .Select(s => new SearchResultDto(
+                    s.FileId,
+                    s.File.File_Name,
+                    s.File.Conference,
+                    s.ShortSummary,
+                    s.Keywords,
+                    s.SearchVector!.Rank(EF.Functions.WebSearchToTsQuery("english", q))
+                ))
+                .ToListAsync();
+
+            return Results.Ok(new { Query = q, Count = results.Count, Results = results });
+        })
+        .RequireAuthorization("ApiAccess")
+        .RequireRateLimiting("AuthenticatedPolicy");
+
         // POST /api/summary - Create or update
         app.MapPost("/api/summary", async (ApiContext db, SummaryRequest req) =>
         {

@@ -216,6 +216,18 @@ namespace defconflix.Data
                 entity.Property(s => s.Keywords).HasColumnType("jsonb");
                 entity.HasIndex(s => s.FileId).IsUnique();
                 entity.HasOne(s => s.File).WithMany().HasForeignKey(s => s.FileId).OnDelete(DeleteBehavior.Cascade);
+
+                // Full-text search vector - stored generated column
+                // Note: Keywords is jsonb, so we cast to text and clean up JSON formatting
+                entity.Property(s => s.SearchVector)
+                    .HasColumnType("tsvector")
+                    .HasComputedColumnSql(
+                        "to_tsvector('english', coalesce(\"ShortSummary\", '') || ' ' || coalesce(\"FullSummary\", '') || ' ' || regexp_replace(coalesce(\"Keywords\"::text, ''), '[\\[\\]\",]', ' ', 'g'))",
+                        stored: true);
+
+                // GIN index for fast full-text search
+                entity.HasIndex(s => s.SearchVector)
+                    .HasMethod("GIN");
             });
         }
     }

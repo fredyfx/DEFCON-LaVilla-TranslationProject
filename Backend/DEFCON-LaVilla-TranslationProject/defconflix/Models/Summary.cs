@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using NpgsqlTypes;
 
 namespace defconflix.Models;
 
@@ -31,4 +32,9 @@ public class Summary
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Full-text search vector. Auto-generated from ShortSummary, FullSummary, Keywords.
+    /// </summary>
+    public NpgsqlTsVector? SearchVector { get; set; }
 }
