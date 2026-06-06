@@ -1,0 +1,328 @@
+@page "/translate"
+@model defconflix.Pages.Translate.IndexModel
+@{
+    ViewData["Title"] = "Translate";
+}
+
+<div class="translate-container">
+    <div class="translate-header">
+        <h2>Translation Editor</h2>
+        <p class="subtitle">Select a file to translate</p>
+    </div>
+
+    <div class="filter-section">
+        <form method="get" class="filter-form">
+            <div class="filter-group">
+                <label for="conference">Conference:</label>
+                <select name="conference" id="conference" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Conferences</option>
+                    @foreach (var conf in Model.AvailableConferences)
+                    {
+                        <option value="@conf.Name" selected="@(Model.Conference == conf.Name)">@conf.Name</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="summary-stats">
+        <div class="summary-item">
+            <span class="summary-value">@Model.TotalFiles</span>
+            <span class="summary-label">Files Available</span>
+        </div>
+    </div>
+
+    @if (Model.Files.Any())
+    {
+        <div class="files-list">
+            @foreach (var file in Model.Files)
+            {
+                <div class="file-card">
+                    <div class="card-header">
+                        <span class="filename">@file.FileName</span>
+                        @if (!string.IsNullOrEmpty(file.Conference))
+                        {
+                            <span class="conference-badge">@file.Conference</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <div class="meta-row">
+                            <span class="meta-item">
+                                <span class="meta-label">Source Cues:</span>
+                                <span class="meta-value">@file.SourceCueCount</span>
+                            </span>
+                        </div>
+                        @if (file.ExistingTranslations.Any())
+                        {
+                            <div class="translations-row">
+                                <span class="meta-label">Existing Translations:</span>
+                                <div class="translation-badges">
+                                    @foreach (var trans in file.ExistingTranslations)
+                                    {
+                                        <span class="translation-badge" title="@trans.CueCount cues, updated @trans.UpdatedAt.ToString("yyyy-MM-dd")">
+                                            @trans.Language.ToUpper() (@trans.CueCount)
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-actions">
+                        <a href="/translate/editor/@file.FileId?lang=es" class="btn-translate">
+                            Translate to Spanish
+                        </a>
+                        <a href="/translate/editor/@file.FileId?lang=pt" class="btn-translate btn-secondary">
+                            Translate to Portuguese
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="pagination-nav">
+                <ul class="pagination">
+                    @if (Model.HasPreviousPage)
+                    {
+                        <li class="page-item">
+                            <a class="page-link" href="/translate?conference=@Model.Conference&page=@(Model.Page - 1)">Previous</a>
+                        </li>
+                    }
+                    @for (int i = Math.Max(1, Model.Page - 2); i <= Math.Min(Model.TotalPages, Model.Page + 2); i++)
+                    {
+                        <li class="page-item @(i == Model.Page ? "active" : "")">
+                            <a class="page-link" href="/translate?conference=@Model.Conference&page=@i">@i</a>
+                        </li>
+                    }
+                    @if (Model.HasNextPage)
+                    {
+                        <li class="page-item">
+                            <a class="page-link" href="/translate?conference=@Model.Conference&page=@(Model.Page + 1)">Next</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="no-data">
+            <h3>No translatable files found</h3>
+            <p>Files need to have English VTT subtitles before they can be translated.</p>
+        </div>
+    }
+</div>
+
+<style>
+    .translate-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .translate-header {
+        text-align: center;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 2rem;
+    }
+
+    .translate-header h2 {
+        color: #0f0;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle { color: #888; }
+
+    .filter-section {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .filter-form {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-group label {
+        color: #888;
+    }
+
+    .summary-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid #333;
+    }
+
+    .summary-item {
+        text-align: center;
+    }
+
+    .summary-value {
+        display: block;
+        font-size: 1.5rem;
+        color: #0ff;
+        font-weight: bold;
+    }
+
+    .summary-label {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .files-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .file-card {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        transition: border-color 0.2s;
+    }
+
+    .file-card:hover {
+        border-color: #0f0;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #333;
+        background: rgba(0, 0, 0, 0.3);
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .filename {
+        color: #0ff;
+        font-weight: bold;
+        word-break: break-all;
+    }
+
+    .conference-badge {
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        border: 1px solid #888;
+        color: #888;
+        background: rgba(128, 128, 128, 0.1);
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .meta-row, .translations-row {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.5rem;
+    }
+
+    .meta-item {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .meta-label {
+        color: #888;
+    }
+
+    .meta-value {
+        color: #fff;
+    }
+
+    .translation-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .translation-badge {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        border: 1px solid #0f0;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .card-actions {
+        padding: 1rem;
+        border-top: 1px solid #333;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-translate {
+        padding: 0.5rem 1rem;
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #0f0;
+        color: #0f0;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+
+    .btn-translate:hover {
+        background: rgba(0, 255, 0, 0.2);
+        color: #0f0;
+    }
+
+    .btn-translate.btn-secondary {
+        border-color: #0ff;
+        color: #0ff;
+        background: rgba(0, 255, 255, 0.1);
+    }
+
+    .btn-translate.btn-secondary:hover {
+        background: rgba(0, 255, 255, 0.2);
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+    }
+
+    .no-data h3 {
+        color: #888;
+        margin-bottom: 0.5rem;
+    }
+
+    .no-data p {
+        color: #666;
+    }
+
+    .pagination-nav {
+        margin-top: 2rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.25rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+</style>

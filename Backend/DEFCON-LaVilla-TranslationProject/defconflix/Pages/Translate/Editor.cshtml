@@ -1,0 +1,611 @@
+@page "/translate/editor/{fileId}"
+@model defconflix.Pages.Translate.EditorModel
+@{
+    ViewData["Title"] = $"Translate - {Model.SourceFile?.File_Name}";
+    var langName = Model.Lang == "es" ? "Spanish" : Model.Lang == "pt" ? "Portuguese" : Model.Lang.ToUpper();
+}
+
+<div class="editor-container">
+    <div class="editor-header">
+        <div class="header-left">
+            <a href="/translate" class="back-link">Back to Files</a>
+            <h2>@Model.SourceFile?.File_Name</h2>
+        </div>
+        <div class="header-right">
+            <div class="progress-info">
+                <span class="progress-text">@Model.TranslatedCues / @Model.TotalCues cues (@Model.ProgressPercent%)</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: @Model.ProgressPercent%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="editor-toolbar">
+        <div class="lang-selector">
+            <span>Translating to:</span>
+            <a href="/translate/editor/@Model.FileId?lang=es&page=@Model.Page" class="lang-btn @(Model.Lang == "es" ? "active" : "")">Spanish</a>
+            <a href="/translate/editor/@Model.FileId?lang=pt&page=@Model.Page" class="lang-btn @(Model.Lang == "pt" ? "active" : "")">Portuguese</a>
+        </div>
+        <div class="toolbar-actions">
+            <button type="button" id="saveAllBtn" class="btn-action">Save All</button>
+            <button type="button" id="markCompleteBtn" class="btn-action btn-success">Mark Complete</button>
+        </div>
+    </div>
+
+    <div class="editor-grid">
+        <div class="grid-header">
+            <div class="col-source">English (Source)</div>
+            <div class="col-target">@langName (Translation)</div>
+        </div>
+
+        @foreach (var cue in Model.Cues)
+        {
+            <div class="cue-row" data-source-cue-id="@cue.SourceCueId" data-sequence="@cue.SequenceOrder">
+                <div class="col-source">
+                    <div class="cue-timestamp">@cue.FormattedTimestamp</div>
+                    <div class="cue-text">@cue.SourceText</div>
+                </div>
+                <div class="col-target">
+                    <div class="cue-timestamp">@cue.FormattedTimestamp</div>
+                    <textarea class="translation-input"
+                              data-source-cue-id="@cue.SourceCueId"
+                              data-target-cue-id="@cue.TargetCueId"
+                              placeholder="Enter translation...">@cue.TranslatedText</textarea>
+                    <div class="cue-actions">
+                        <button type="button" class="btn-save-cue" title="Save (Ctrl+S)">Save</button>
+                        <span class="save-status"></span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="pagination-nav">
+            <ul class="pagination">
+                @if (Model.HasPreviousPage)
+                {
+                    <li class="page-item">
+                        <a class="page-link" href="/translate/editor/@Model.FileId?lang=@Model.Lang&page=@(Model.Page - 1)">Previous</a>
+                    </li>
+                }
+                @for (int i = Math.Max(1, Model.Page - 2); i <= Math.Min(Model.TotalPages, Model.Page + 2); i++)
+                {
+                    <li class="page-item @(i == Model.Page ? "active" : "")">
+                        <a class="page-link" href="/translate/editor/@Model.FileId?lang=@Model.Lang&page=@i">@i</a>
+                    </li>
+                }
+                @if (Model.HasNextPage)
+                {
+                    <li class="page-item">
+                        <a class="page-link" href="/translate/editor/@Model.FileId?lang=@Model.Lang&page=@(Model.Page + 1)">Next</a>
+                    </li>
+                }
+            </ul>
+            <span class="page-info">Page @Model.Page of @Model.TotalPages</span>
+        </nav>
+    }
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+@section Scripts {
+<script>
+    const fileId = @Model.FileId;
+    const lang = '@Model.Lang';
+    let targetVttId = @(Model.TargetVtt?.Id ?? 0);
+    let saveTimeout = null;
+    let pendingSaves = new Map();
+
+    // Start translation if not already started
+    async function ensureTranslationStarted() {
+        if (targetVttId > 0) return;
+
+        try {
+            const response = await fetch(`/api/translate/${fileId}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetLanguage: lang })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                targetVttId = data.targetVttFileId;
+            }
+        } catch (err) {
+            console.error('Failed to start translation:', err);
+        }
+    }
+
+    // Save single cue
+    async function saveCue(textarea) {
+        await ensureTranslationStarted();
+
+        const row = textarea.closest('.cue-row');
+        const sourceCueId = parseInt(textarea.dataset.sourceCueId);
+        const text = textarea.value.trim();
+        const statusEl = row.querySelector('.save-status');
+
+        statusEl.textContent = 'Saving...';
+        statusEl.className = 'save-status saving';
+
+        try {
+            const response = await fetch(`/api/translate/${targetVttId}/cues/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cues: [{ sourceCueId, text }]
+                })
+            });
+
+            if (response.ok) {
+                statusEl.textContent = 'Saved';
+                statusEl.className = 'save-status saved';
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                    statusEl.className = 'save-status';
+                }, 2000);
+            } else {
+                throw new Error('Save failed');
+            }
+        } catch (err) {
+            statusEl.textContent = 'Error';
+            statusEl.className = 'save-status error';
+            console.error('Save error:', err);
+        }
+    }
+
+    // Save all cues on page
+    async function saveAll() {
+        await ensureTranslationStarted();
+
+        const cues = [];
+        document.querySelectorAll('.translation-input').forEach(textarea => {
+            const text = textarea.value.trim();
+            if (text) {
+                cues.push({
+                    sourceCueId: parseInt(textarea.dataset.sourceCueId),
+                    text
+                });
+            }
+        });
+
+        if (cues.length === 0) {
+            showToast('No translations to save', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/translate/${targetVttId}/cues/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cues })
+            });
+
+            if (response.ok) {
+                showToast(`Saved ${cues.length} cues`, 'success');
+                updateProgress();
+            } else {
+                throw new Error('Save failed');
+            }
+        } catch (err) {
+            showToast('Error saving cues', 'error');
+            console.error('Save all error:', err);
+        }
+    }
+
+    // Mark translation complete
+    async function markComplete() {
+        if (!targetVttId) {
+            showToast('No translation to complete', 'warning');
+            return;
+        }
+
+        if (!confirm('Mark this translation as complete?')) return;
+
+        try {
+            const response = await fetch(`/api/translate/${targetVttId}/complete`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                showToast('Translation marked as complete!', 'success');
+            } else {
+                throw new Error('Failed to mark complete');
+            }
+        } catch (err) {
+            showToast('Error marking complete', 'error');
+            console.error('Mark complete error:', err);
+        }
+    }
+
+    // Update progress
+    async function updateProgress() {
+        if (!targetVttId) return;
+
+        try {
+            const response = await fetch(`/api/translate/${targetVttId}/progress`);
+            if (response.ok) {
+                const data = await response.json();
+                document.querySelector('.progress-text').textContent =
+                    `${data.translatedCues} / ${data.totalCues} cues (${data.percentComplete}%)`;
+                document.querySelector('.progress-fill').style.width = `${data.percentComplete}%`;
+            }
+        } catch (err) {
+            console.error('Progress update error:', err);
+        }
+    }
+
+    // Toast notification
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast ${type}`;
+        setTimeout(() => toast.className = 'toast hidden', 3000);
+    }
+
+    // Event handlers
+    document.addEventListener('DOMContentLoaded', () => {
+        // Save button per cue
+        document.querySelectorAll('.btn-save-cue').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const textarea = btn.closest('.col-target').querySelector('.translation-input');
+                saveCue(textarea);
+            });
+        });
+
+        // Auto-save on blur with debounce
+        document.querySelectorAll('.translation-input').forEach(textarea => {
+            textarea.addEventListener('blur', () => {
+                if (textarea.value.trim()) {
+                    saveCue(textarea);
+                }
+            });
+
+            // Ctrl+S to save current cue
+            textarea.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    saveCue(textarea);
+                }
+                // Ctrl+Enter to save and move to next
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    saveCue(textarea);
+                    const rows = Array.from(document.querySelectorAll('.translation-input'));
+                    const currentIndex = rows.indexOf(textarea);
+                    if (currentIndex < rows.length - 1) {
+                        rows[currentIndex + 1].focus();
+                    }
+                }
+                // Tab to move to next
+                if (e.key === 'Tab' && !e.shiftKey) {
+                    const rows = Array.from(document.querySelectorAll('.translation-input'));
+                    const currentIndex = rows.indexOf(textarea);
+                    if (currentIndex < rows.length - 1) {
+                        e.preventDefault();
+                        rows[currentIndex + 1].focus();
+                    }
+                }
+            });
+        });
+
+        // Save All button
+        document.getElementById('saveAllBtn').addEventListener('click', saveAll);
+
+        // Mark Complete button
+        document.getElementById('markCompleteBtn').addEventListener('click', markComplete);
+
+        // Global Ctrl+S
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's' && !document.activeElement.classList.contains('translation-input')) {
+                e.preventDefault();
+                saveAll();
+            }
+        });
+    });
+</script>
+}
+
+<style>
+    .editor-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #333;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .back-link {
+        color: #0ff;
+        font-size: 0.9rem;
+    }
+
+    .header-left h2 {
+        color: #0f0;
+        font-size: 1.25rem;
+        margin: 0;
+        word-break: break-all;
+    }
+
+    .progress-info {
+        text-align: right;
+    }
+
+    .progress-text {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #888;
+    }
+
+    .progress-bar {
+        width: 200px;
+        height: 8px;
+        background: #333;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: #0f0;
+        transition: width 0.3s;
+    }
+
+    .editor-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .lang-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .lang-selector span {
+        color: #888;
+    }
+
+    .lang-btn {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #333;
+        color: #888;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+
+    .lang-btn.active {
+        border-color: #0f0;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .toolbar-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-action {
+        padding: 0.5rem 1rem;
+        border: 1px solid #0ff;
+        background: rgba(0, 255, 255, 0.1);
+        color: #0ff;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9rem;
+    }
+
+    .btn-action:hover {
+        background: rgba(0, 255, 255, 0.2);
+    }
+
+    .btn-action.btn-success {
+        border-color: #0f0;
+        color: #0f0;
+        background: rgba(0, 255, 0, 0.1);
+    }
+
+    .btn-action.btn-success:hover {
+        background: rgba(0, 255, 0, 0.2);
+    }
+
+    .editor-grid {
+        border: 1px solid #333;
+    }
+
+    .grid-header {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: rgba(0, 255, 0, 0.1);
+        border-bottom: 1px solid #333;
+    }
+
+    .grid-header > div {
+        padding: 0.75rem 1rem;
+        font-weight: bold;
+        color: #0f0;
+    }
+
+    .grid-header .col-target {
+        border-left: 1px solid #333;
+    }
+
+    .cue-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid #222;
+    }
+
+    .cue-row:last-child {
+        border-bottom: none;
+    }
+
+    .cue-row:hover {
+        background: rgba(0, 255, 0, 0.02);
+    }
+
+    .col-source, .col-target {
+        padding: 0.75rem 1rem;
+    }
+
+    .col-target {
+        border-left: 1px solid #333;
+    }
+
+    .cue-timestamp {
+        font-size: 0.75rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+        font-family: monospace;
+    }
+
+    .cue-text {
+        color: #ccc;
+        line-height: 1.4;
+    }
+
+    .translation-input {
+        width: 100%;
+        min-height: 60px;
+        padding: 0.5rem;
+        background: #111;
+        border: 1px solid #333;
+        color: #0f0;
+        font-family: inherit;
+        font-size: 0.95rem;
+        resize: vertical;
+    }
+
+    .translation-input:focus {
+        outline: none;
+        border-color: #0f0;
+        box-shadow: 0 0 0 2px rgba(0, 255, 0, 0.1);
+    }
+
+    .cue-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .btn-save-cue {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #333;
+        background: transparent;
+        color: #888;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-family: inherit;
+    }
+
+    .btn-save-cue:hover {
+        border-color: #0f0;
+        color: #0f0;
+    }
+
+    .save-status {
+        font-size: 0.8rem;
+    }
+
+    .save-status.saving { color: #ff0; }
+    .save-status.saved { color: #0f0; }
+    .save-status.error { color: #f00; }
+
+    .pagination-nav {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.25rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .page-info {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        border-radius: 4px;
+        z-index: 1000;
+        transition: opacity 0.3s;
+    }
+
+    .toast.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .toast.success {
+        background: rgba(0, 255, 0, 0.9);
+        color: #000;
+    }
+
+    .toast.error {
+        background: rgba(255, 0, 0, 0.9);
+        color: #fff;
+    }
+
+    .toast.warning {
+        background: rgba(255, 255, 0, 0.9);
+        color: #000;
+    }
+
+    .toast.info {
+        background: rgba(0, 255, 255, 0.9);
+        color: #000;
+    }
+
+    @@media (max-width: 768px) {
+        .grid-header,
+        .cue-row {
+            grid-template-columns: 1fr;
+        }
+
+        .grid-header .col-target,
+        .col-target {
+            border-left: none;
+            border-top: 1px solid #333;
+        }
+
+        .col-source {
+            background: rgba(0, 0, 0, 0.2);
+        }
+    }
+</style>
