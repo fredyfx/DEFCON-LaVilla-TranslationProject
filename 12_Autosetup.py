@@ -4,6 +4,8 @@ Auto Setup Script
 
 Installs all required dependencies for the DEFCON Translation Project.
 Creates a virtual environment and installs all packages.
+
+Supports: macOS, Linux (Debian/Ubuntu, Fedora, Arch), Windows
 """
 
 import sys
@@ -12,14 +14,31 @@ import shutil
 import os
 import platform
 import venv
+from dataclasses import dataclass
+from typing import Optional, List
 
-# ANSI colors
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-RESET = "\033[0m"
-BOLD = "\033[1m"
+# ANSI colors (disabled on Windows unless using Windows Terminal)
+if platform.system() == 'Windows':
+    # Enable ANSI on Windows 10+
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+        GREEN = "\033[92m"
+        RED = "\033[91m"
+        YELLOW = "\033[93m"
+        CYAN = "\033[96m"
+        RESET = "\033[0m"
+        BOLD = "\033[1m"
+    except:
+        GREEN = RED = YELLOW = CYAN = RESET = BOLD = ""
+else:
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
 
 VENV_NAME = "LaVillaHacker"
 
@@ -28,7 +47,85 @@ WHISPERX_MAX_PYTHON = (3, 14)
 WHISPERX_MIN_PYTHON = (3, 10)
 
 
-def find_compatible_python() -> str:
+@dataclass
+class OSInfo:
+    """Operating system information."""
+    name: str  # 'macos', 'linux', 'windows'
+    distro: str  # 'debian', 'fedora', 'arch', 'macos', 'windows'
+    package_manager: str  # 'brew', 'apt', 'dnf', 'pacman', 'winget', 'choco', ''
+    pm_install_cmd: List[str]  # ['brew', 'install'] or ['sudo', 'apt', 'install', '-y']
+
+
+def detect_os() -> OSInfo:
+    """Detect OS and available package manager."""
+    system = platform.system().lower()
+
+    if system == 'darwin':
+        # macOS
+        pm = 'brew' if shutil.which('brew') else ''
+        return OSInfo(
+            name='macos',
+            distro='macos',
+            package_manager=pm,
+            pm_install_cmd=['brew', 'install'] if pm else []
+        )
+
+    elif system == 'linux':
+        # Detect Linux distro
+        distro = 'unknown'
+        try:
+            with open('/etc/os-release', 'r') as f:
+                content = f.read().lower()
+                if 'ubuntu' in content or 'debian' in content or 'mint' in content:
+                    distro = 'debian'
+                elif 'fedora' in content or 'rhel' in content or 'centos' in content:
+                    distro = 'fedora'
+                elif 'arch' in content or 'manjaro' in content:
+                    distro = 'arch'
+                elif 'suse' in content:
+                    distro = 'suse'
+        except:
+            pass
+
+        # Detect package manager
+        if shutil.which('apt'):
+            return OSInfo('linux', distro or 'debian', 'apt', ['sudo', 'apt', 'install', '-y'])
+        elif shutil.which('dnf'):
+            return OSInfo('linux', distro or 'fedora', 'dnf', ['sudo', 'dnf', 'install', '-y'])
+        elif shutil.which('pacman'):
+            return OSInfo('linux', distro or 'arch', 'pacman', ['sudo', 'pacman', '-S', '--noconfirm'])
+        elif shutil.which('zypper'):
+            return OSInfo('linux', distro or 'suse', 'zypper', ['sudo', 'zypper', 'install', '-y'])
+        elif shutil.which('brew'):
+            return OSInfo('linux', distro, 'brew', ['brew', 'install'])
+        else:
+            return OSInfo('linux', distro, '', [])
+
+    elif system == 'windows':
+        # Windows - check for winget or choco
+        if shutil.which('winget'):
+            return OSInfo('windows', 'windows', 'winget', ['winget', 'install', '--silent'])
+        elif shutil.which('choco'):
+            return OSInfo('windows', 'windows', 'choco', ['choco', 'install', '-y'])
+        else:
+            return OSInfo('windows', 'windows', '', [])
+
+    return OSInfo('unknown', 'unknown', '', [])
+
+
+def print_os_info(os_info: OSInfo):
+    """Print detected OS information."""
+    print(f"\n{BOLD}Detected System:{RESET}")
+    print(f"  OS: {os_info.name}")
+    if os_info.name == 'linux':
+        print(f"  Distro: {os_info.distro}")
+    if os_info.package_manager:
+        print(f"  Package Manager: {GREEN}{os_info.package_manager}{RESET}")
+    else:
+        print(f"  Package Manager: {RED}Not found{RESET}")
+
+
+def find_compatible_python(os_info: OSInfo) -> str:
     """Find a Python version compatible with WhisperX (<3.14, >=3.10)."""
     current_version = sys.version_info[:2]
 
@@ -40,31 +137,47 @@ def find_compatible_python() -> str:
     print(f"WhisperX requires Python >=3.10, <3.14")
     print(f"\n{CYAN}Searching for compatible Python version...{RESET}")
 
-    # Look for compatible Python versions (prefer newer)
     candidates = []
 
-    # Check common Homebrew paths (macOS)
-    brew_paths = [
-        '/opt/homebrew/opt/python@3.13/bin/python3.13',
-        '/opt/homebrew/opt/python@3.12/bin/python3.12',
-        '/opt/homebrew/opt/python@3.11/bin/python3.11',
-        '/opt/homebrew/opt/python@3.10/bin/python3.10',
-        '/usr/local/opt/python@3.13/bin/python3.13',
-        '/usr/local/opt/python@3.12/bin/python3.12',
-        '/usr/local/opt/python@3.11/bin/python3.11',
-        '/usr/local/opt/python@3.10/bin/python3.10',
-    ]
+    if os_info.name == 'macos':
+        # Homebrew paths (macOS)
+        brew_paths = [
+            '/opt/homebrew/opt/python@3.13/bin/python3.13',
+            '/opt/homebrew/opt/python@3.12/bin/python3.12',
+            '/opt/homebrew/opt/python@3.11/bin/python3.11',
+            '/opt/homebrew/opt/python@3.10/bin/python3.10',
+            '/usr/local/opt/python@3.13/bin/python3.13',
+            '/usr/local/opt/python@3.12/bin/python3.12',
+            '/usr/local/opt/python@3.11/bin/python3.11',
+            '/usr/local/opt/python@3.10/bin/python3.10',
+        ]
+        for path in brew_paths:
+            if os.path.exists(path):
+                candidates.append(path)
 
-    # Check system paths
-    system_paths = [
-        'python3.13', 'python3.12', 'python3.11', 'python3.10'
-    ]
+    elif os_info.name == 'windows':
+        # Windows paths
+        win_paths = [
+            os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python313\python.exe'),
+            os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python312\python.exe'),
+            os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python311\python.exe'),
+            os.path.expandvars(r'%LOCALAPPDATA%\Programs\Python\Python310\python.exe'),
+            r'C:\Python313\python.exe',
+            r'C:\Python312\python.exe',
+            r'C:\Python311\python.exe',
+            r'C:\Python310\python.exe',
+        ]
+        for path in win_paths:
+            if os.path.exists(path):
+                candidates.append(path)
 
-    for path in brew_paths:
-        if os.path.exists(path):
-            candidates.append(path)
+    # Check system PATH (all platforms)
+    if os_info.name == 'windows':
+        system_cmds = ['python3.13', 'python3.12', 'python3.11', 'python3.10', 'python']
+    else:
+        system_cmds = ['python3.13', 'python3.12', 'python3.11', 'python3.10']
 
-    for cmd in system_paths:
+    for cmd in system_cmds:
         full_path = shutil.which(cmd)
         if full_path and full_path not in candidates:
             candidates.append(full_path)
@@ -87,16 +200,26 @@ def find_compatible_python() -> str:
         except:
             continue
 
-    # No compatible version found
+    # No compatible version found - print install instructions
     print(f"\n{RED}No compatible Python found!{RESET}")
     print(f"\n{BOLD}Install Python 3.13:{RESET}")
-    if platform.system().lower() == 'darwin':
-        print("  brew install python@3.13")
-    else:
-        print("  # Install Python 3.13 from https://python.org")
-    print(f"\nThen run this script again with:")
-    print(f"  /path/to/python3.13 {os.path.basename(__file__)}")
 
+    if os_info.name == 'macos':
+        print("  brew install python@3.13")
+    elif os_info.name == 'linux':
+        if os_info.distro == 'debian':
+            print("  sudo apt update && sudo apt install python3.13 python3.13-venv")
+        elif os_info.distro == 'fedora':
+            print("  sudo dnf install python3.13")
+        elif os_info.distro == 'arch':
+            print("  sudo pacman -S python")
+        else:
+            print("  # Install Python 3.13 from https://python.org")
+    elif os_info.name == 'windows':
+        print("  winget install Python.Python.3.13")
+        print("  # Or download from https://python.org")
+
+    print(f"\nThen run this script again.")
     return ""
 
 
@@ -277,40 +400,80 @@ def check_ollama() -> bool:
         return False
 
 
-def install_brew_package(package: str) -> bool:
-    """Install a package via Homebrew (macOS only)."""
-    if platform.system().lower() != 'darwin':
-        print(f"   {YELLOW}[SKIP]{RESET} Homebrew only available on macOS")
+def install_system_package(os_info: OSInfo, package: str, alt_names: dict = None) -> bool:
+    """Install a package using the system package manager.
+
+    Args:
+        os_info: OS information
+        package: Default package name
+        alt_names: Dict of {package_manager: package_name} for alternatives
+    """
+    if not os_info.package_manager:
+        print(f"   {YELLOW}[SKIP]{RESET} No package manager found")
         return False
 
-    if not shutil.which('brew'):
-        print(f"   {RED}[FAIL]{RESET} Homebrew not installed")
-        print(f"   Install from: https://brew.sh")
-        return False
+    # Get package name for this package manager
+    pkg_name = package
+    if alt_names and os_info.package_manager in alt_names:
+        pkg_name = alt_names[os_info.package_manager]
 
-    return run_command(['brew', 'install', package], f"Installing {package} via Homebrew")
+    cmd = os_info.pm_install_cmd + [pkg_name]
+    return run_command(cmd, f"Installing {pkg_name} via {os_info.package_manager}")
 
 
-def install_system_tools() -> tuple:
+def install_system_tools(os_info: OSInfo) -> tuple:
     """Install FFmpeg and Ollama if missing."""
-    system = platform.system().lower()
-
     ffmpeg_ok = check_ffmpeg()
     ollama_ok = check_ollama()
 
-    if system == 'darwin':
-        # macOS - use Homebrew
+    if not os_info.package_manager:
+        print(f"\n{YELLOW}No package manager detected. Install manually:{RESET}")
         if not ffmpeg_ok:
-            print(f"\n{CYAN}Attempting to install FFmpeg...{RESET}")
-            ffmpeg_ok = install_brew_package('ffmpeg')
-            if ffmpeg_ok:
-                ffmpeg_ok = check_ffmpeg()  # Verify
-
+            print(f"  - FFmpeg: https://ffmpeg.org/download.html")
         if not ollama_ok:
-            print(f"\n{CYAN}Attempting to install Ollama...{RESET}")
-            ollama_ok = install_brew_package('ollama')
-            if ollama_ok:
-                ollama_ok = check_ollama()  # Verify
+            print(f"  - Ollama: https://ollama.ai")
+        return ffmpeg_ok, ollama_ok
+
+    # FFmpeg package names vary by distro
+    ffmpeg_names = {
+        'apt': 'ffmpeg',
+        'dnf': 'ffmpeg-free',  # Fedora uses ffmpeg-free in default repos
+        'pacman': 'ffmpeg',
+        'brew': 'ffmpeg',
+        'winget': 'Gyan.FFmpeg',
+        'choco': 'ffmpeg',
+    }
+
+    # Ollama package names
+    ollama_names = {
+        'brew': 'ollama',
+        'winget': 'Ollama.Ollama',
+        'choco': 'ollama',
+        # Linux distros typically need curl install
+    }
+
+    if not ffmpeg_ok:
+        print(f"\n{CYAN}Attempting to install FFmpeg...{RESET}")
+        if install_system_package(os_info, 'ffmpeg', ffmpeg_names):
+            ffmpeg_ok = check_ffmpeg()
+
+    if not ollama_ok:
+        print(f"\n{CYAN}Attempting to install Ollama...{RESET}")
+
+        # Special handling for Linux (curl script)
+        if os_info.name == 'linux' and os_info.package_manager not in ['brew']:
+            print(f"   {CYAN}Installing Ollama via official script...{RESET}")
+            result = run_command(
+                ['bash', '-c', 'curl -fsSL https://ollama.ai/install.sh | sh'],
+                "Installing Ollama"
+            )
+            if result:
+                ollama_ok = check_ollama()
+        elif os_info.package_manager in ollama_names:
+            if install_system_package(os_info, 'ollama', ollama_names):
+                ollama_ok = check_ollama()
+        else:
+            print(f"   {YELLOW}[MANUAL]{RESET} Install Ollama from https://ollama.ai")
 
     return ffmpeg_ok, ollama_ok
 
@@ -340,38 +503,41 @@ def pull_ollama_model() -> bool:
     return run_command(['ollama', 'pull', model], f"Pulling {model}")
 
 
-def print_system_install_instructions():
+def print_system_install_instructions(os_info: OSInfo):
     """Print instructions for installing system tools."""
-    system = platform.system().lower()
-
     print(f"\n{BOLD}{'='*60}{RESET}")
-    print(f"{BOLD}System Tools Installation{RESET}")
+    print(f"{BOLD}Manual Installation Required{RESET}")
     print(f"{'='*60}")
 
     # FFmpeg
     if not shutil.which('ffmpeg'):
         print(f"\n{BOLD}FFmpeg:{RESET}")
-        if system == 'darwin':
+        if os_info.name == 'macos':
             print("  brew install ffmpeg")
-        elif system == 'linux':
-            print("  sudo apt install ffmpeg      # Debian/Ubuntu")
-            print("  sudo dnf install ffmpeg      # Fedora")
-            print("  sudo pacman -S ffmpeg        # Arch")
-        elif system == 'windows':
-            print("  choco install ffmpeg         # Chocolatey")
-            print("  winget install ffmpeg        # WinGet")
-            print("  Or download from: https://ffmpeg.org/download.html")
+        elif os_info.name == 'linux':
+            if os_info.distro == 'debian':
+                print("  sudo apt install ffmpeg")
+            elif os_info.distro == 'fedora':
+                print("  sudo dnf install ffmpeg-free")
+            elif os_info.distro == 'arch':
+                print("  sudo pacman -S ffmpeg")
+            else:
+                print("  # Install ffmpeg using your package manager")
+        elif os_info.name == 'windows':
+            print("  winget install Gyan.FFmpeg")
+            print("  # Or: choco install ffmpeg")
+            print("  # Or download from: https://ffmpeg.org/download.html")
 
     # Ollama
     if not shutil.which('ollama'):
         print(f"\n{BOLD}Ollama (for local AI translation):{RESET}")
-        if system == 'darwin':
+        if os_info.name == 'macos':
             print("  brew install ollama")
-            print("  Or download from: https://ollama.ai")
-        elif system == 'linux':
+        elif os_info.name == 'linux':
             print("  curl -fsSL https://ollama.ai/install.sh | sh")
-        elif system == 'windows':
-            print("  Download from: https://ollama.ai")
+        elif os_info.name == 'windows':
+            print("  winget install Ollama.Ollama")
+            print("  # Or download from: https://ollama.ai")
 
         print(f"\n  After installing Ollama, pull the translation model:")
         print(f"  ollama pull qwen2.5:7b")
@@ -419,8 +585,12 @@ def main():
     print(f"{BOLD}  Virtual Environment: {VENV_NAME}{RESET}")
     print(f"{'='*60}\n")
 
+    # Detect OS
+    os_info = detect_os()
+    print_os_info(os_info)
+
     # Check Python version
-    print(f"{BOLD}Checking Python version...{RESET}")
+    print(f"\n{BOLD}Checking Python version...{RESET}")
     if not check_python_version():
         print(f"\n{RED}Setup aborted. Please upgrade Python to 3.9+{RESET}")
         return 1
@@ -435,7 +605,7 @@ def main():
     print(f"{BOLD}Python Compatibility Check{RESET}")
     print(f"{'='*60}")
 
-    compatible_python = find_compatible_python()
+    compatible_python = find_compatible_python(os_info)
     if not compatible_python:
         return 1
 
@@ -484,7 +654,7 @@ def main():
     print(f"{BOLD}System Tools (FFmpeg, Ollama){RESET}")
     print(f"{'='*60}")
 
-    ffmpeg_ok, ollama_ok = install_system_tools()
+    ffmpeg_ok, ollama_ok = install_system_tools(os_info)
 
     # Pull Ollama model if Ollama is installed
     if ollama_ok:
@@ -492,7 +662,7 @@ def main():
 
     # Print manual install instructions if still missing
     if not ffmpeg_ok or not ollama_ok:
-        print_system_install_instructions()
+        print_system_install_instructions(os_info)
 
     # Summary
     print(f"\n{BOLD}{'='*60}{RESET}")
