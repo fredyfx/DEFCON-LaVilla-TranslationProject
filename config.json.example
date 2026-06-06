@@ -1,0 +1,14 @@
+{
+  "api_key": "your-api-key-here",
+  "base_url": "http://localhost:5000",
+  "download_dir": "./downloads",
+  "audio_dir": "./audio",
+  "vtt_dir": "./vtt",
+  "progress_file": "./progress.json",
+  "whisperx": {
+    "model": "medium",
+    "device": "cuda",
+    "compute_type": "float16",
+    "batch_size": 16
+  }
+}
