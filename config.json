@@ -18,6 +18,9 @@
     "host": "http://localhost:11434",
     "target_languages": ["es", "pt"],
     "batch_size": 5,
-    "timeout": 120
+    "timeout": 120,
+    "summarizer_enabled": true,
+    "summary_timeout": 180,
+    "max_cues_for_summary": 500
   }
 }

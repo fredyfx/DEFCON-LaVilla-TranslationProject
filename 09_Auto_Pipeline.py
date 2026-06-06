@@ -486,6 +486,95 @@ Translation:"""
         return output_path
 
 
+class OllamaSummarizer:
+    """Generate summaries of VTT content using Ollama local LLM."""
+
+    def __init__(self, config: dict):
+        self.enabled = config.get('summarizer_enabled', True)
+        self.model = config.get('model', 'qwen2.5:7b')
+        self.host = config.get('host', 'http://localhost:11434')
+        self.timeout = config.get('summary_timeout', 180)
+        self.max_cues = config.get('max_cues_for_summary', 500)
+
+    def generate_summary(self, cues: List[VttCue], video_title: str = "") -> Optional[dict]:
+        """Generate structured summary from VTT cues.
+
+        Returns dict: {'short_summary', 'key_topics', 'keywords', 'full_summary'} or None
+        """
+        if not self.enabled:
+            return None
+
+        transcript = " ".join(c.text for c in cues[:self.max_cues])
+        prompt = self._build_prompt(transcript, video_title)
+
+        try:
+            response = requests.post(
+                f"{self.host}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.3, "num_predict": 1024}
+                },
+                timeout=self.timeout
+            )
+            if response.status_code == 200:
+                return self._parse_response(response.json().get('response', ''))
+        except Exception as e:
+            logger.error(f"Summary generation failed: {e}")
+        return None
+
+    def _build_prompt(self, transcript: str, title: str) -> str:
+        title_ctx = f"Video Title: {title}\n\n" if title else ""
+        return f"""{title_ctx}Analyze this video transcript and provide:
+
+1. SHORT_SUMMARY: 1-2 sentences (max 200 chars) for video description
+2. KEY_TOPICS: 3-5 bullet points of main topics discussed
+3. KEYWORDS: 5-15 single words or short phrases for search/tagging (comma-separated)
+4. FULL_SUMMARY: 2-3 paragraphs detailed overview
+
+Transcript:
+{transcript}
+
+Respond in this exact format:
+SHORT_SUMMARY: <text>
+KEY_TOPICS:
+- <topic>
+KEYWORDS: <word1>, <word2>, <word3>
+FULL_SUMMARY:
+<text>"""
+
+    def _parse_response(self, raw: str) -> Optional[dict]:
+        result = {'short_summary': '', 'key_topics': [], 'keywords': [], 'full_summary': ''}
+        try:
+            if 'SHORT_SUMMARY:' in raw:
+                start = raw.index('SHORT_SUMMARY:') + 14
+                end = raw.index('KEY_TOPICS:') if 'KEY_TOPICS:' in raw else len(raw)
+                result['short_summary'] = raw[start:end].strip()[:500]
+
+            if 'KEY_TOPICS:' in raw:
+                start = raw.index('KEY_TOPICS:') + 11
+                end = raw.index('KEYWORDS:') if 'KEYWORDS:' in raw else (raw.index('FULL_SUMMARY:') if 'FULL_SUMMARY:' in raw else len(raw))
+                topics = raw[start:end].strip()
+                result['key_topics'] = [l.lstrip('- ').strip() for l in topics.split('\n') if l.strip().startswith('-')][:10]
+
+            if 'KEYWORDS:' in raw:
+                start = raw.index('KEYWORDS:') + 9
+                end = raw.index('FULL_SUMMARY:') if 'FULL_SUMMARY:' in raw else len(raw)
+                keywords_raw = raw[start:end].strip()
+                # Handle both comma-separated and newline-separated
+                keywords = [k.strip().lower() for k in keywords_raw.replace('\n', ',').split(',') if k.strip()]
+                result['keywords'] = keywords[:20]
+
+            if 'FULL_SUMMARY:' in raw:
+                start = raw.index('FULL_SUMMARY:') + 13
+                result['full_summary'] = raw[start:].strip()[:5000]
+
+            return result if result['short_summary'] or result['full_summary'] else None
+        except Exception:
+            return None
+
+
 class BackendClient:
     """API client for submitting VTT cues to backend."""
 
@@ -695,6 +784,30 @@ class BackendClient:
         # Mark complete
         return self.complete_translation(target_vtt_id)
 
+    def submit_summary(self, file_id: int, summary: dict) -> bool:
+        """Submit generated summary to backend."""
+        url = f"{self.base_url}/api/summary"
+        payload = {
+            "fileId": file_id,
+            "shortSummary": summary.get('short_summary', ''),
+            "keyTopics": summary.get('key_topics', []),
+            "keywords": summary.get('keywords', []),
+            "fullSummary": summary.get('full_summary', ''),
+            "generatedBy": "ollama"
+        }
+
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+                response.raise_for_status()
+                logger.info(f"Summary submitted for file {file_id}")
+                return True
+            except requests.RequestException as e:
+                logger.warning(f"Summary submit attempt {attempt + 1} failed: {e}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.BACKOFF_FACTOR ** attempt)
+        return False
+
 
 def parse_input_file(filepath: str) -> List[Tuple[int, str]]:
     """Parse input file with Id + URL format.
@@ -846,6 +959,19 @@ def main():
                         except Exception as e:
                             logger.error(f"Translation to {target_lang} failed: {e}")
                             # Continue with other languages, don't fail the whole item
+
+                # Summary generation (after translations)
+                if ollama_config.get('summarizer_enabled', True):
+                    summarizer = OllamaSummarizer(ollama_config)
+                    try:
+                        logger.info(f"Generating summary for ID {item_id}")
+                        summary = summarizer.generate_summary(cues, filename)
+                        if summary:
+                            backend.submit_summary(item_id, summary)
+                            logger.info(f"Summary submitted for ID {item_id}")
+                    except Exception as e:
+                        logger.error(f"Summary generation failed: {e}")
+                        # Don't fail whole item if summary fails
 
                 progress.mark_processed(item_id)
                 processed += 1
