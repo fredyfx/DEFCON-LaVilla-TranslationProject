@@ -18,6 +18,7 @@ namespace defconflix.Data
         public DbSet<CrawlerJob> CrawlerJobs { get; set; }
         public DbSet<ProblematicUri> ProblematicUris { get; set; }
         public DbSet<Conference> Conferences { get; set; }
+        public DbSet<Summary> Summaries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -202,6 +203,19 @@ namespace defconflix.Data
                 entity.HasIndex(p => p.IsResolved);
                 entity.HasIndex(p => p.CrawlerJobId);
                 entity.HasIndex(p => p.Extension);
+            });
+
+            modelBuilder.Entity<Summary>(entity =>
+            {
+                entity.HasKey(s => s.Id);
+                entity.Property(s => s.ShortSummary).IsRequired().HasMaxLength(500);
+                entity.Property(s => s.FullSummary).HasMaxLength(5000);
+                entity.Property(s => s.GeneratedBy).HasMaxLength(50).HasDefaultValue("ollama");
+                entity.Property(s => s.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(s => s.KeyTopics).HasColumnType("jsonb");
+                entity.Property(s => s.Keywords).HasColumnType("jsonb");
+                entity.HasIndex(s => s.FileId).IsUnique();
+                entity.HasOne(s => s.File).WithMany().HasForeignKey(s => s.FileId).OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

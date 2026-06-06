@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using defconflix.Data;
@@ -12,9 +13,11 @@ using defconflix.Data;
 namespace defconflix.Migrations
 {
     [DbContext(typeof(ApiContext))]
-    partial class ApiContextModelSnapshot : ModelSnapshot
+    [Migration("20260605211646_AddSummaryEntity")]
+    partial class AddSummaryEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -316,10 +319,6 @@ namespace defconflix.Migrations
                         .HasDefaultValue("ollama");
 
                     b.PrimitiveCollection<List<string>>("KeyTopics")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
-
-                    b.PrimitiveCollection<List<string>>("Keywords")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
