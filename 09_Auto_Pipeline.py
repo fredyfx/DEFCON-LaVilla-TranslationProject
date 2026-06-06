@@ -3,7 +3,7 @@
 Automatic Video Downloader & VTT Pipeline
 
 Downloads videos, extracts audio, generates VTT via WhisperX,
-and submits cues to backend API with resume capability.
+translates via Ollama, and submits cues to backend API with resume capability.
 """
 
 import json
@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import logging
+import subprocess
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
@@ -62,6 +63,17 @@ class ConfigManager:
                 raise ValueError(f"Missing required config key: {key}")
         if self.config['api_key'] == 'your-api-key-here':
             raise ValueError("Please set a valid API key in config.json")
+
+    @property
+    def ollama_config(self) -> dict:
+        return self.config.get('ollama', {
+            'enabled': True,
+            'model': 'qwen2.5:7b',
+            'host': 'http://localhost:11434',
+            'target_languages': ['es', 'pt'],
+            'batch_size': 5,
+            'timeout': 120
+        })
 
     def _ensure_directories(self):
         for dir_key in ['download_dir', 'audio_dir', 'vtt_dir']:
@@ -287,6 +299,193 @@ class WhisperXProcessor:
         logger.info(f"VTT saved: {output_path}")
 
 
+class OllamaTranslator:
+    """Translate VTT cues using Ollama local LLM."""
+
+    LANGUAGE_NAMES = {
+        'es': 'Spanish',
+        'pt': 'Portuguese'
+    }
+
+    def __init__(self, config: dict, vtt_dir: str):
+        self.enabled = config.get('enabled', True)
+        self.model = config.get('model', 'qwen2.5:7b')
+        self.host = config.get('host', 'http://localhost:11434')
+        self.target_languages = config.get('target_languages', ['es', 'pt'])
+        self.batch_size = config.get('batch_size', 5)
+        self.timeout = config.get('timeout', 120)
+        self.vtt_dir = vtt_dir
+
+    def ensure_ollama_running(self) -> bool:
+        """Check if Ollama is running, attempt to start if not."""
+        try:
+            response = requests.get(f"{self.host}/api/tags", timeout=5)
+            if response.status_code == 200:
+                logger.info("Ollama is running")
+                return True
+        except requests.RequestException:
+            pass
+
+        # Try to start Ollama
+        logger.info("Starting Ollama...")
+        try:
+            subprocess.Popen(
+                ['ollama', 'serve'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            time.sleep(3)
+
+            # Check again
+            response = requests.get(f"{self.host}/api/tags", timeout=5)
+            if response.status_code == 200:
+                logger.info("Ollama started successfully")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to start Ollama: {e}")
+
+        return False
+
+    def ensure_model_available(self) -> bool:
+        """Check if model is available, pull if not."""
+        try:
+            response = requests.get(f"{self.host}/api/tags", timeout=10)
+            if response.status_code == 200:
+                models = response.json().get('models', [])
+                model_names = [m.get('name', '') for m in models]
+
+                # Check for exact match or partial match
+                if any(self.model in name or name in self.model for name in model_names):
+                    logger.info(f"Model {self.model} is available")
+                    return True
+
+                # Pull the model
+                logger.info(f"Pulling model {self.model}...")
+                pull_response = requests.post(
+                    f"{self.host}/api/pull",
+                    json={"name": self.model},
+                    timeout=600,
+                    stream=True
+                )
+
+                for line in pull_response.iter_lines():
+                    if line:
+                        data = json.loads(line)
+                        status = data.get('status', '')
+                        if 'pulling' in status or 'downloading' in status:
+                            logger.info(f"  {status}")
+
+                logger.info(f"Model {self.model} pulled successfully")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to ensure model availability: {e}")
+
+        return False
+
+    def translate_cue(self, text: str, target_lang: str) -> Optional[str]:
+        """Translate a single cue text."""
+        lang_name = self.LANGUAGE_NAMES.get(target_lang, target_lang)
+
+        prompt = f"""Translate the following subtitle text from English to {lang_name}.
+Keep the translation natural and conversational, suitable for subtitles.
+Only output the translation, nothing else.
+
+Text to translate:
+{text}
+
+Translation:"""
+
+        try:
+            response = requests.post(
+                f"{self.host}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "num_predict": 256
+                    }
+                },
+                timeout=self.timeout
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                translation = result.get('response', '').strip()
+                return translation if translation else None
+
+        except Exception as e:
+            logger.warning(f"Translation failed: {e}")
+
+        return None
+
+    def translate_batch(self, cues: List[VttCue], target_lang: str) -> List[Tuple[VttCue, str]]:
+        """Translate a batch of cues, return list of (source_cue, translated_text)."""
+        results = []
+
+        for cue in cues:
+            translation = self.translate_cue(cue.text, target_lang)
+            if translation:
+                results.append((cue, translation))
+            else:
+                logger.warning(f"Cue {cue.sequence_order} translation failed, skipping")
+
+        return results
+
+    def translate_all(self, cues: List[VttCue], target_lang: str) -> Dict[int, str]:
+        """Translate all cues, return dict of {sequence_order: translated_text}."""
+        if not self.enabled:
+            logger.info("Ollama translation disabled")
+            return {}
+
+        lang_name = self.LANGUAGE_NAMES.get(target_lang, target_lang)
+        logger.info(f"Translating {len(cues)} cues to {lang_name}")
+
+        translations = {}
+        total = len(cues)
+
+        for i in range(0, total, self.batch_size):
+            batch = cues[i:i + self.batch_size]
+            batch_num = (i // self.batch_size) + 1
+            total_batches = (total + self.batch_size - 1) // self.batch_size
+
+            logger.info(f"Translating batch {batch_num}/{total_batches}")
+
+            for cue in batch:
+                translation = self.translate_cue(cue.text, target_lang)
+                if translation:
+                    translations[cue.sequence_order] = translation
+
+            # Small delay between batches to avoid overloading
+            if i + self.batch_size < total:
+                time.sleep(0.5)
+
+        logger.info(f"Translated {len(translations)}/{total} cues to {lang_name}")
+        return translations
+
+    def save_translated_vtt(
+        self,
+        source_cues: List[VttCue],
+        translations: Dict[int, str],
+        item_id: int,
+        target_lang: str
+    ):
+        """Save translated VTT file locally."""
+        output_path = os.path.join(self.vtt_dir, f"{item_id}_{target_lang}.vtt")
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write("WEBVTT\n\n")
+            for cue in source_cues:
+                if cue.sequence_order in translations:
+                    f.write(f"{cue.start_time} --> {cue.end_time}\n")
+                    f.write(f"{translations[cue.sequence_order]}\n\n")
+
+        logger.info(f"Translated VTT saved: {output_path}")
+        return output_path
+
+
 class BackendClient:
     """API client for submitting VTT cues to backend."""
 
@@ -383,6 +582,119 @@ class BackendClient:
 
         return True, []
 
+    # --- Translation Endpoints ---
+
+    def start_translation(self, file_id: int, target_language: str) -> Optional[int]:
+        """Start translation for a file, returns target VTT file ID."""
+        url = f"{self.base_url}/api/translate/{file_id}/start"
+        payload = {"targetLanguage": target_language}
+
+        try:
+            response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            target_vtt_id = data.get('targetVttFileId')
+            logger.info(f"Started translation for file {file_id} -> {target_language} (VTT ID: {target_vtt_id})")
+            return target_vtt_id
+        except requests.RequestException as e:
+            logger.error(f"Failed to start translation: {e}")
+            return None
+
+    def submit_translations_bulk(self, vtt_file_id: int, translations: List[Dict]) -> bool:
+        """Submit translated cues in bulk.
+
+        Args:
+            vtt_file_id: Target VTT file ID
+            translations: List of {"sourceCueId": int, "text": str}
+        """
+        url = f"{self.base_url}/api/translate/{vtt_file_id}/cues/bulk"
+        payload = {"cues": translations}
+
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                response = requests.post(url, json=payload, headers=self.headers, timeout=60)
+                response.raise_for_status()
+                logger.info(f"Submitted {len(translations)} translations to VTT {vtt_file_id}")
+                return True
+            except requests.RequestException as e:
+                logger.warning(f"Bulk submit attempt {attempt + 1} failed: {e}")
+                if attempt < self.MAX_RETRIES - 1:
+                    time.sleep(self.BACKOFF_FACTOR ** attempt)
+
+        logger.error(f"Bulk submit failed after {self.MAX_RETRIES} attempts")
+        return False
+
+    def get_translation_progress(self, vtt_file_id: int) -> Optional[Dict]:
+        """Get translation progress."""
+        url = f"{self.base_url}/api/translate/{vtt_file_id}/progress"
+
+        try:
+            response = requests.get(url, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to get progress: {e}")
+            return None
+
+    def complete_translation(self, vtt_file_id: int) -> bool:
+        """Mark translation as complete."""
+        url = f"{self.base_url}/api/translate/{vtt_file_id}/complete"
+
+        try:
+            response = requests.post(url, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            logger.info(f"Marked translation {vtt_file_id} as complete")
+            return True
+        except requests.RequestException as e:
+            logger.error(f"Failed to complete translation: {e}")
+            return False
+
+    def submit_full_translation(
+        self,
+        file_id: int,
+        source_cues: List[VttCue],
+        translations: Dict[int, str],
+        target_language: str
+    ) -> bool:
+        """Submit a full translation for a file.
+
+        Args:
+            file_id: Source file ID
+            source_cues: List of source VttCue objects
+            translations: Dict mapping sequence_order -> translated text
+            target_language: Target language code (e.g., 'es', 'pt')
+
+        Returns:
+            True if successful
+        """
+        # Start translation (creates target VTT file)
+        target_vtt_id = self.start_translation(file_id, target_language)
+        if not target_vtt_id:
+            return False
+
+        # Build bulk payload using sequence order (pipeline doesn't have DB IDs)
+        bulk_cues = []
+        for cue in source_cues:
+            if cue.sequence_order in translations:
+                bulk_cues.append({
+                    "sequenceOrder": cue.sequence_order,
+                    "text": translations[cue.sequence_order]
+                })
+
+        if not bulk_cues:
+            logger.warning(f"No translations to submit for file {file_id}")
+            return False
+
+        # Submit in batches of 50
+        batch_size = 50
+        for i in range(0, len(bulk_cues), batch_size):
+            batch = bulk_cues[i:i + batch_size]
+            if not self.submit_translations_bulk(target_vtt_id, batch):
+                return False
+
+        # Mark complete
+        return self.complete_translation(target_vtt_id)
+
 
 def parse_input_file(filepath: str) -> List[Tuple[int, str]]:
     """Parse input file with Id + URL format.
@@ -420,10 +732,10 @@ def parse_input_file(filepath: str) -> List[Tuple[int, str]]:
     return items
 
 
-def cleanup_temp_files(video_path: str, audio_path: str, keep_audio: bool = False):
+def cleanup_temp_files(video_path: str, audio_path: str, keep_video: bool = True, keep_audio: bool = False):
     """Remove temporary files after successful processing."""
     try:
-        if os.path.exists(video_path):
+        if not keep_video and os.path.exists(video_path):
             os.remove(video_path)
             logger.debug(f"Removed: {video_path}")
         if not keep_audio and os.path.exists(audio_path):
@@ -462,6 +774,19 @@ def main():
     whisperx_proc = WhisperXProcessor(config.whisperx_config, config.get('vtt_dir'))
     backend = BackendClient(config.get('base_url'), config.get('api_key'))
 
+    # Initialize Ollama translator
+    ollama_config = config.ollama_config
+    translator = OllamaTranslator(ollama_config, config.get('vtt_dir'))
+
+    # Check Ollama availability if enabled
+    if ollama_config.get('enabled', True):
+        if not translator.ensure_ollama_running():
+            logger.warning("Ollama not available, translations will be skipped")
+            ollama_config['enabled'] = False
+        elif not translator.ensure_model_available():
+            logger.warning(f"Model {ollama_config.get('model')} not available, translations will be skipped")
+            ollama_config['enabled'] = False
+
     # Parse input
     items = parse_input_file(input_file)
     if not items:
@@ -496,11 +821,38 @@ def main():
             success, failed_cues = backend.submit_cues(item_id, cues, filename)
 
             if success:
+                # Translation step (if Ollama enabled)
+                if translator.enabled:
+                    for target_lang in translator.target_languages:
+                        try:
+                            logger.info(f"Translating ID {item_id} to {target_lang}")
+                            translations = translator.translate_all(cues, target_lang)
+
+                            if translations:
+                                # Save translated VTT locally
+                                translator.save_translated_vtt(cues, translations, item_id, target_lang)
+
+                                # Submit to backend
+                                trans_success = backend.submit_full_translation(
+                                    item_id, cues, translations, target_lang
+                                )
+                                if trans_success:
+                                    logger.info(f"Translation to {target_lang} complete for ID {item_id}")
+                                else:
+                                    logger.warning(f"Translation submission to {target_lang} failed for ID {item_id}")
+                            else:
+                                logger.warning(f"No translations generated for {target_lang}")
+
+                        except Exception as e:
+                            logger.error(f"Translation to {target_lang} failed: {e}")
+                            # Continue with other languages, don't fail the whole item
+
                 progress.mark_processed(item_id)
                 processed += 1
 
-                # Cleanup temp files
-                cleanup_temp_files(video_path, audio_path)
+                # Cleanup temp files (keep video by default)
+                keep_video = config.get('keep_video', True)
+                cleanup_temp_files(video_path, audio_path, keep_video=keep_video)
             else:
                 if failed_cues:
                     reason = f"Cues failed after retries: {failed_cues}"
