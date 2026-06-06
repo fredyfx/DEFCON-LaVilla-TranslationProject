@@ -21,6 +21,8 @@
     "timeout": 120,
     "summarizer_enabled": true,
     "summary_timeout": 180,
-    "max_cues_for_summary": 500
+    "max_cues_for_summary": 500,
+    "max_chars_for_summary": 50000,
+    "pdf_output_dir": "./pdf_extracts"
   }
 }

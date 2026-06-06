@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Automatic Video Downloader & VTT Pipeline
+Automatic Media Processing Pipeline
 
-Downloads videos, extracts audio, generates VTT via WhisperX,
-translates via Ollama, and submits cues to backend API with resume capability.
+Processes videos and documents:
+- Videos: Download → Audio extraction → WhisperX transcription → Translation → Summary
+- Documents (PDF, DOCX, etc.): Download → MarkItDown extraction → Summary + Keywords
+
+Submits results to backend API with resume capability.
 """
 
 import json
@@ -21,6 +24,7 @@ import requests
 import ffmpeg
 import whisperx
 import gc
+from markitdown import MarkItDown
 
 logging.basicConfig(
     level=logging.INFO,
@@ -487,7 +491,7 @@ Translation:"""
 
 
 class OllamaSummarizer:
-    """Generate summaries of VTT content using Ollama local LLM."""
+    """Generate summaries from text content using Ollama local LLM."""
 
     def __init__(self, config: dict):
         self.enabled = config.get('summarizer_enabled', True)
@@ -495,8 +499,9 @@ class OllamaSummarizer:
         self.host = config.get('host', 'http://localhost:11434')
         self.timeout = config.get('summary_timeout', 180)
         self.max_cues = config.get('max_cues_for_summary', 500)
+        self.max_chars = config.get('max_chars_for_summary', 50000)
 
-    def generate_summary(self, cues: List[VttCue], video_title: str = "") -> Optional[dict]:
+    def generate_summary(self, cues: List[VttCue], title: str = "") -> Optional[dict]:
         """Generate structured summary from VTT cues.
 
         Returns dict: {'short_summary', 'key_topics', 'keywords', 'full_summary'} or None
@@ -505,7 +510,24 @@ class OllamaSummarizer:
             return None
 
         transcript = " ".join(c.text for c in cues[:self.max_cues])
-        prompt = self._build_prompt(transcript, video_title)
+        return self.generate_summary_from_text(transcript, title, content_type="video transcript")
+
+    def generate_summary_from_text(self, text: str, title: str = "", content_type: str = "document") -> Optional[dict]:
+        """Generate structured summary from raw text.
+
+        Args:
+            text: Raw text content to summarize
+            title: Optional title for context
+            content_type: Type of content (e.g., "video transcript", "PDF document")
+
+        Returns dict: {'short_summary', 'key_topics', 'keywords', 'full_summary'} or None
+        """
+        if not self.enabled:
+            return None
+
+        # Truncate text if too long
+        truncated_text = text[:self.max_chars]
+        prompt = self._build_prompt(truncated_text, title, content_type)
 
         try:
             response = requests.post(
@@ -524,17 +546,17 @@ class OllamaSummarizer:
             logger.error(f"Summary generation failed: {e}")
         return None
 
-    def _build_prompt(self, transcript: str, title: str) -> str:
-        title_ctx = f"Video Title: {title}\n\n" if title else ""
-        return f"""{title_ctx}Analyze this video transcript and provide:
+    def _build_prompt(self, text: str, title: str, content_type: str = "document") -> str:
+        title_ctx = f"Title: {title}\n\n" if title else ""
+        return f"""{title_ctx}Analyze this {content_type} and provide:
 
-1. SHORT_SUMMARY: 1-2 sentences (max 200 chars) for video description
+1. SHORT_SUMMARY: 1-2 sentences (max 200 chars) description
 2. KEY_TOPICS: 3-5 bullet points of main topics discussed
 3. KEYWORDS: 5-15 single words or short phrases for search/tagging (comma-separated)
 4. FULL_SUMMARY: 2-3 paragraphs detailed overview
 
-Transcript:
-{transcript}
+Content:
+{text}
 
 Respond in this exact format:
 SHORT_SUMMARY: <text>
@@ -573,6 +595,62 @@ FULL_SUMMARY:
             return result if result['short_summary'] or result['full_summary'] else None
         except Exception:
             return None
+
+
+class PdfProcessor:
+    """Extract text from PDF files using MarkItDown."""
+
+    SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.html', '.htm', '.epub'}
+
+    def __init__(self, config: dict):
+        self.md = MarkItDown()
+        self.output_dir = config.get('pdf_output_dir', './pdf_extracts')
+        os.makedirs(self.output_dir, exist_ok=True)
+
+    @classmethod
+    def is_supported(cls, filepath: str) -> bool:
+        """Check if file type is supported for text extraction."""
+        ext = os.path.splitext(filepath)[1].lower()
+        return ext in cls.SUPPORTED_EXTENSIONS
+
+    def extract_text(self, filepath: str) -> Optional[str]:
+        """Extract text content from document.
+
+        Returns extracted text or None if extraction fails.
+        """
+        if not os.path.exists(filepath):
+            logger.error(f"File not found: {filepath}")
+            return None
+
+        try:
+            logger.info(f"Extracting text from: {filepath}")
+            result = self.md.convert(filepath)
+            text = result.text_content
+
+            if not text or not text.strip():
+                logger.warning(f"No text extracted from: {filepath}")
+                return None
+
+            # Save extracted text for reference
+            self._save_extracted(filepath, text)
+
+            logger.info(f"Extracted {len(text)} chars from {filepath}")
+            return text
+
+        except Exception as e:
+            logger.error(f"Text extraction failed for {filepath}: {e}")
+            return None
+
+    def _save_extracted(self, source_path: str, text: str):
+        """Save extracted text to markdown file."""
+        basename = os.path.splitext(os.path.basename(source_path))[0]
+        output_path = os.path.join(self.output_dir, f"{basename}.md")
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(text)
+            logger.debug(f"Saved extracted text: {output_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save extracted text: {e}")
 
 
 class BackendClient:
@@ -858,11 +936,31 @@ def cleanup_temp_files(video_path: str, audio_path: str, keep_video: bool = True
         logger.warning(f"Cleanup failed: {e}")
 
 
+def get_file_type(filepath: str) -> str:
+    """Determine file type based on extension.
+
+    Returns: 'video', 'document', or 'unknown'
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+
+    video_exts = {'.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'}
+    document_exts = {'.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.html', '.htm', '.epub'}
+
+    if ext in video_exts:
+        return 'video'
+    elif ext in document_exts:
+        return 'document'
+    else:
+        return 'unknown'
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python 09_Auto_Pipeline.py <input_file> [--config <config.json>]")
         print("\nInput file format (one per line):")
         print("  12345 https://example.com/video.mp4")
+        print("  12346 https://example.com/document.pdf")
+        print("\nSupported: .mp4, .mkv, .avi, .mov (video) | .pdf, .docx, .pptx, .xlsx (documents)")
         sys.exit(1)
 
     input_file = sys.argv[1]
@@ -887,9 +985,11 @@ def main():
     whisperx_proc = WhisperXProcessor(config.whisperx_config, config.get('vtt_dir'))
     backend = BackendClient(config.get('base_url'), config.get('api_key'))
 
-    # Initialize Ollama translator
+    # Initialize Ollama translator and summarizer
     ollama_config = config.ollama_config
     translator = OllamaTranslator(ollama_config, config.get('vtt_dir'))
+    pdf_processor = PdfProcessor(ollama_config)
+    summarizer = OllamaSummarizer(ollama_config)
 
     # Check Ollama availability if enabled
     if ollama_config.get('enabled', True):
@@ -916,76 +1016,107 @@ def main():
             continue
 
         logger.info(f"Processing ID {item_id}: {url}")
-        video_path = None
+        file_path = None
         audio_path = None
 
         try:
-            # Download
-            video_path = downloader.download(url, item_id)
+            # Download file
+            file_path = downloader.download(url, item_id)
+            filename = os.path.basename(file_path)
+            file_type = get_file_type(file_path)
 
-            # Extract audio
-            audio_path = extractor.extract(video_path, item_id)
+            logger.info(f"Detected file type: {file_type} for {filename}")
 
-            # Generate VTT
-            cues = whisperx_proc.process(audio_path, item_id)
+            if file_type == 'document':
+                # === DOCUMENT PROCESSING (PDF, DOCX, etc.) ===
+                text = pdf_processor.extract_text(file_path)
 
-            # Submit to backend
-            filename = os.path.basename(video_path)
-            success, failed_cues = backend.submit_cues(item_id, cues, filename)
+                if not text:
+                    progress.mark_failed(item_id, "Text extraction failed")
+                    failed += 1
+                    continue
 
-            if success:
-                # Translation step (if Ollama enabled)
-                if translator.enabled:
-                    for target_lang in translator.target_languages:
-                        try:
-                            logger.info(f"Translating ID {item_id} to {target_lang}")
-                            translations = translator.translate_all(cues, target_lang)
-
-                            if translations:
-                                # Save translated VTT locally
-                                translator.save_translated_vtt(cues, translations, item_id, target_lang)
-
-                                # Submit to backend
-                                trans_success = backend.submit_full_translation(
-                                    item_id, cues, translations, target_lang
-                                )
-                                if trans_success:
-                                    logger.info(f"Translation to {target_lang} complete for ID {item_id}")
-                                else:
-                                    logger.warning(f"Translation submission to {target_lang} failed for ID {item_id}")
-                            else:
-                                logger.warning(f"No translations generated for {target_lang}")
-
-                        except Exception as e:
-                            logger.error(f"Translation to {target_lang} failed: {e}")
-                            # Continue with other languages, don't fail the whole item
-
-                # Summary generation (after translations)
+                # Generate summary + keywords from extracted text
                 if ollama_config.get('summarizer_enabled', True):
-                    summarizer = OllamaSummarizer(ollama_config)
                     try:
-                        logger.info(f"Generating summary for ID {item_id}")
-                        summary = summarizer.generate_summary(cues, filename)
+                        logger.info(f"Generating summary for document ID {item_id}")
+                        summary = summarizer.generate_summary_from_text(
+                            text, filename, content_type="PDF document"
+                        )
                         if summary:
                             backend.submit_summary(item_id, summary)
-                            logger.info(f"Summary submitted for ID {item_id}")
+                            logger.info(f"Summary submitted for document ID {item_id}")
+                        else:
+                            logger.warning(f"No summary generated for document ID {item_id}")
                     except Exception as e:
-                        logger.error(f"Summary generation failed: {e}")
-                        # Don't fail whole item if summary fails
+                        logger.error(f"Document summary generation failed: {e}")
 
                 progress.mark_processed(item_id)
                 processed += 1
 
-                # Cleanup temp files (keep video by default)
-                keep_video = config.get('keep_video', True)
-                cleanup_temp_files(video_path, audio_path, keep_video=keep_video)
             else:
-                if failed_cues:
-                    reason = f"Cues failed after retries: {failed_cues}"
+                # === VIDEO PROCESSING ===
+                # Extract audio
+                audio_path = extractor.extract(file_path, item_id)
+
+                # Generate VTT
+                cues = whisperx_proc.process(audio_path, item_id)
+
+                # Submit to backend
+                success, failed_cues = backend.submit_cues(item_id, cues, filename)
+
+                if success:
+                    # Translation step (if Ollama enabled)
+                    if translator.enabled:
+                        for target_lang in translator.target_languages:
+                            try:
+                                logger.info(f"Translating ID {item_id} to {target_lang}")
+                                translations = translator.translate_all(cues, target_lang)
+
+                                if translations:
+                                    # Save translated VTT locally
+                                    translator.save_translated_vtt(cues, translations, item_id, target_lang)
+
+                                    # Submit to backend
+                                    trans_success = backend.submit_full_translation(
+                                        item_id, cues, translations, target_lang
+                                    )
+                                    if trans_success:
+                                        logger.info(f"Translation to {target_lang} complete for ID {item_id}")
+                                    else:
+                                        logger.warning(f"Translation submission to {target_lang} failed for ID {item_id}")
+                                else:
+                                    logger.warning(f"No translations generated for {target_lang}")
+
+                            except Exception as e:
+                                logger.error(f"Translation to {target_lang} failed: {e}")
+                                # Continue with other languages, don't fail the whole item
+
+                    # Summary generation (after translations)
+                    if ollama_config.get('summarizer_enabled', True):
+                        try:
+                            logger.info(f"Generating summary for ID {item_id}")
+                            summary = summarizer.generate_summary(cues, filename)
+                            if summary:
+                                backend.submit_summary(item_id, summary)
+                                logger.info(f"Summary submitted for ID {item_id}")
+                        except Exception as e:
+                            logger.error(f"Summary generation failed: {e}")
+                            # Don't fail whole item if summary fails
+
+                    progress.mark_processed(item_id)
+                    processed += 1
+
+                    # Cleanup temp files (keep video by default)
+                    keep_video = config.get('keep_video', True)
+                    cleanup_temp_files(file_path, audio_path, keep_video=keep_video)
                 else:
-                    reason = "Backend submission failed"
-                progress.mark_failed(item_id, reason)
-                failed += 1
+                    if failed_cues:
+                        reason = f"Cues failed after retries: {failed_cues}"
+                    else:
+                        reason = "Backend submission failed"
+                    progress.mark_failed(item_id, reason)
+                    failed += 1
 
         except Exception as e:
             logger.error(f"Failed to process {item_id}: {e}")
