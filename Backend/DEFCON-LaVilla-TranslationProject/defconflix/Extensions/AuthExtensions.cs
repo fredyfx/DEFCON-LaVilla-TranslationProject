@@ -264,6 +264,7 @@ namespace defconflix.Extensions
                 options.AddPolicy("ApiAccess", policy =>
                 {
                     policy.AuthenticationSchemes.Add(ApiKeyAuthenticationSchemeOptions.DefaultScheme);
+                    policy.AuthenticationSchemes.Add(CookieAuthenticationDefaults.AuthenticationScheme);
                     policy.Requirements.Add(new ApiAccessRequirement());
                 });
 
